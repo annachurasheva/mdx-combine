@@ -3,7 +3,7 @@ import { join, basename } from 'node:path'
 import process from 'node:process'
 
 const INBOX = 'inbox'
-const TARGET = 'D:/projects/astro-theme-retypeset/src/content/posts'   // ← поправь один раз
+const TARGET = 'C:/astro-projects/astro-theme-retypeset/src/content/posts'   // ← поправь один раз
 
 const REQUIRED = ['title', 'published', 'abbrlink']
 const FORBIDDEN = ['description']
