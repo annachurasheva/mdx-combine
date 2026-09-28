@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>MDX-комбайн (Retypeset-ready)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 1200px; margin: 0 auto; padding: 1rem; }
+    .controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+    .controls label { display: block; margin-top: 0.5rem; }
+    .controls input, .controls textarea, .controls select { width: 100%; padding: 0.5rem; }
+    .preview { background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 0.5rem; margin-top: 1rem; font-family: monospace; white-space: pre-wrap; }
+    .actions { margin-top: 1rem; }
+    button { padding: 0.75rem 1.25rem; cursor: pointer; background: #007acc; color: white; border: none; border-radius: 0.25rem; }
+    button:hover { background: #005a9e; }
+    button.secondary { background: #555; }
+    button.secondary:hover { background: #444; }
+    .status { margin-top: 0.5rem; font-size: 0.9rem; color: #555; }
+    .note { margin-top: 0.5rem; font-size: 0.85rem; color: #666; }
+    .error { color: red; }
+  </style>
+</head>
+<body>
+  <h1>MDX-комбайн (Retypeset-ready)</h1>
+  <p>Конвертирует HTML-контент в Markdown и формирует frontmatter по шаблону Astro (Retypeset). Убраны лишние поля, добавлен abbrlink, исправлена обработка картинок.</p>
+
+  <div class="controls">
+    <div>
+      <label>Заголовок (title)</label>
+      <input type="text" id="title" placeholder="Например: Как работает Astro" />
+      <label>Slug (автозаполняется из title)</label>
+      <input type="text" id="slug" placeholder="Например: how-astro-works" readonly />
+      <label>Имя файла (без .md)</label>
+      <input type="text" id="filename" placeholder="Например: how-astro-works" />
+      <label>Abbrlink (обязательно, только строчные буквы, цифры, дефисы)</label>
+      <input type="text" id="abbrlink" placeholder="Например: my-post-slug" required />
+    </div>
+    <div>
+      <label>Авторы (через запятую)</label>
+      <input type="text" id="authors" placeholder="Например: Ivan Petrov, Anna Smirnova" />
+      <label>Теги (через запятую)</label>
+      <input type="text" id="tags" placeholder="Например: astro, mdx, tutorial" />
+    </div>
+    <div>
+      <label>Draft (черновик)</label>
+      <select id="draft">
+        <option value="false">false</option>
+        <option value="true">true</option>
+      </select>
+      <label>Pin (закрепить)</label>
+      <input type="number" id="pin" value="0" min="0" />
+      <label>TOC (оглавление)</label>
+      <select id="toc">
+        <option value="true">true</option>
+        <option value="false">false</option>
+      </select>
+    </div>
+  </div>
+
+  <label>Контент (вставьте HTML сюда — Ctrl+V)</label>
+  <textarea id="htmlContent" rows="10" placeholder="Сюда вставьте HTML-контент со страницы"></textarea>
+  <div class="note">Картинки с внешними ссылками (https://...) будут работать сразу. Относительные пути будут преобразованы в /assets/...</div>
+
+  <div class="actions">
+    <button id="generateBtn">Создать .md</button>
+    <button id="downloadBtn" class="secondary" disabled>Скачать .md</button>
+    <button id="copyBtn" class="secondary" disabled>Копировать</button>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <h3>Результат (preview)</h3>
+  <div class="preview" id="preview"></div>
+
+  <script>
+    // --- Сохранение последнего заполнения ---
+    const fields = ['title', 'slug', 'filename', 'abbrlink', 'authors', 'tags', 'draft', 'pin', 'toc'];
+    fields.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        const saved = localStorage.getItem(id);
+        if (saved) el.value = saved;
+        el.addEventListener('input', () => localStorage.setItem(id, el.value));
+      }
+    });
+
+    // Автозаполнение slug из title
+    const titleEl = document.getElementById('title');
+    const slugEl = document.getElementById('slug');
+    const filenameEl = document.getElementById('filename');
+
+    function slugify(text) {
+      return text
+        .toString()
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '-')
+        .replace(/[^\w\-]+/g, '')
+        .replace(/\-\-+/g, '-')
+        .replace(/^-+/, '')
+        .replace(/-+\$/, '');
+    }
+
+    titleEl.addEventListener('input', () => {
+      const slug = slugify(titleEl.value);
+      slugEl.value = slug;
+      filenameEl.value = slug;
+      localStorage.setItem('slug', slug);
+      localStorage.setItem('filename', slug);
+    });
+
+    // Конвертер HTML -> Markdown
+    function htmlToMarkdown(html) {
+      if (!html) return '';
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+
+      // Удаляем скрипты и стили
+      doc.querySelectorAll('script, style').forEach(el => el.remove());
+
+      // Заголовки
+      doc.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(el => {
+        const level = parseInt(el.tagName.substring(1));
+        el.outerHTML = '\n\n' + '#'.repeat(level) + ' ' + el.innerText.trim() + '\n';
+      });
+
+      // Параграфы
+      doc.querySelectorAll('p').forEach(el => {
+        el.outerHTML = '\n\n' + el.innerText.trim() + '\n';
+      });
+
+      // Списки
+      doc.querySelectorAll('ul, ol').forEach(list => {
+        const items = Array.from(list.children);
+        const isOrdered = list.tagName === 'OL';
+        let md = '\n';
+        items.forEach((li, i) => {
+          const prefix = isOrdered ? `\${i + 1}. ` : '- ';
+          md += prefix + (li.innerText.trim() || '') + '\n';
+        });
+        list.outerHTML = md;
+      });
+
+      // Ссылки
+      doc.querySelectorAll('a').forEach(a => {
+        const href = a.getAttribute('href') || '';
+        const text = a.innerText.trim() || href;
+        a.outerHTML = `[${text}](${href})`;
+      });
+
+      // Жирный и курсив
+      doc.querySelectorAll('b, strong').forEach(el => el.outerHTML = `**\${el.innerText.trim()}**`);
+      doc.querySelectorAll('i, em').forEach(el => el.outerHTML = `*\${el.innerText.trim()}*`);
+
+      // Код
+      doc.querySelectorAll('code').forEach(el => {
+        if (el.parentElement && el.parentElement.tagName === 'PRE') {
+          el.outerHTML = el.innerText;
+        } else {
+          el.outerHTML = ``\`\${el.innerText.trim()}\``;
+        }
+      });
+
+      // Блоки кода (pre + code)
+      doc.querySelectorAll('pre').forEach(pre => {
+        const code = pre.querySelector('code');
+        const content = code ? code.innerText.trim() : pre.innerText.trim();
+        pre.outerHTML = '\n\n```\n' + content + '\n```\n';
+      });
+
+      // Изображения — исправленная логика
+      doc.querySelectorAll('img').forEach(img => {
+        let src = img.getAttribute('src') || '';
+        const alt = img.getAttribute('alt') || 'Изображение';
+
+        // Если ссылка внешняя — оставляем как есть
+        if (src.startsWith('http://') || src.startsWith('https://')) {
+          // ничего не делаем
+        } else {
+          // Относительные пути перенаправляем в /assets/
+          src = '/assets/' + src.replace(/^\/+/, '');
+        }
+
+        img.outerHTML = `![${alt}](${src})`;
+      });
+
+      // Убираем лишние переносы
+      let text = doc.body.innerHTML.replace(/\n+/g, '\n').trim();
+      return text;
+    }
+
+    const generateBtn = document.getElementById('generateBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const previewEl = document.getElementById('preview');
+    const statusEl = document.getElementById('status');
+
+    generateBtn.addEventListener('click', () => {
+      const title = titleEl.value.trim();
+      const slug = slugEl.value.trim();
+      const filename = filenameEl.value.trim() || slug;
+      const abbrlink = document.getElementById('abbrlink').value.trim();
+      const authors = document.getElementById('authors').value.trim();
+      const tagsInput = document.getElementById('tags').value.trim();
+      const draft = document.getElementById('draft').value === 'true';
+      const pin = parseInt(document.getElementById('pin').value) || 0;
+      const toc = document.getElementById('toc').value === 'true';
+      const htmlContent = document.getElementById('htmlContent').value.trim();
+
+      // Валидация abbrlink
+      const abbrlinkRegex = /^[a-z0-9\-]+\$/;
+      if (!abbrlink || !abbrlinkRegex.test(abbrlink)) {
+        statusEl.textContent = 'Ошибка: abbrlink должен содержать только строчные буквы, цифры и дефисы.';
+        statusEl.style.color = 'red';
+        return;
+      }
+
+      if (!title) {
+        statusEl.textContent = 'Ошибка: заполните заголовок (title).';
+        statusEl.style.color = 'red';
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(Boolean) : ;
+
+      const frontmatter = `---
+title: \${title}
+abbrlink: \${abbrlink}
+published: \${now}
+updated: ''
+tags:
+${tags.map(t => `  - ${t}`).join('\n')}
+draft: \${draft}
+pin: \${pin}
+toc: \${toc}
+lang: ''
+abbrlink: ''
+authorIds: ${authors ? `'${authors}'` : "''"}
+---
+`;
+
+      const markdownContent = htmlToMarkdown(htmlContent);
+      const fullContent = frontmatter + '\n' + markdownContent;
+
+      previewEl.textContent = fullContent;
+      statusEl.textContent = `Готово: ${filename}.md — ${fullContent.length} символов`;
+      statusEl.style.color = 'green';
+
+      downloadBtn.disabled = false;
+      copyBtn.disabled = false;
+
+      downloadBtn.onclick = () => {
+        const blob = new Blob([fullContent], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `\${filename}.md`;
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      copyBtn.onclick = () => {
+        navigator.clipboard.writeText(fullContent).then(() => {
+          statusEl.textContent = 'Скопировано в буфер обмена!';
+        });
+      };
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>MDX Template Builder</title>
+  <style>
+    :root { --primary: #2c3e50; --success: #27ae60; --error: #c0392b; --bg: #f4f6f8; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); padding: 2rem; }
+    .container { max-width: 1000px; margin: 0 auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    
+    /* Grid Layout */
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; }
+    .card { background: #f9f9f9; padding: 1rem; border-radius: 6px; border: 1px solid #eee; }
+    
+    /* Form Elements */
+    label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: #333; }
+    input, textarea, select { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; transition: border 0.2s; }
+    input:focus, textarea:focus { outline: none; border-color: var(--primary); }
+    
+    /* Validation States */
+    input.invalid { border-color: var(--error); background-color: #fdf2f2; }
+    input.valid { border-color: var(--success); }
+    .error-msg { color: var(--error); font-size: 0.85rem; margin-top: 0.25rem; display: none; }
+    .card.error .error-msg { display: block; }
+
+    /* Actions */
+    .actions { margin-top: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+    button { padding: 0.8rem 1.5rem; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; color: white; transition: opacity 0.2s; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; background: #ccc; }
+    .btn-gen { background: var(--primary); }
+    .btn-dl { background: var(--success); }
+    
+    /* Preview */
+    .preview-area { margin-top: 2rem; }
+    pre { background: #1e1e1e; color: #fff; padding: 1.5rem; border-radius: 6px; overflow-x: auto; font-size: 0.9rem; }
+    .status { margin-top: 1rem; padding: 0.5rem; border-radius: 4px; display: none; }
+    .status.success { background: #d4edda; color: #155724; display: block; }
+    .status.error { background: #f8d7da; color: #721c24; display: block; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>MDX Template Constructor</h1>
+  <p>Генератор фронтенд-метаданных для Astro/Retypeset. Защита от пустых полей.</p>
+
+  <div class="grid">
+    <!-- Блок 1: Основные данные -->
+    <div class="card">
+      <label>Title (Заголовок) *</label>
+      <input type="text" id="title" placeholder="История села..." required />
+      <label>Abbrlink (Авто/Ручное) *</label>
+      <input type="text" id="abbrlink" placeholder="auto-generated..." />
+      <small style="color:#666">Только a-z, 0-9, -. Регистр важен.</small>
+      <div class="error-msg">Требуется валидный slug (латиница, дефисы)</div>
+    </div>
+
+    <!-- Блок 2: Метаданные -->
+    <div class="card">
+      <label>Authors</label>
+      <input type="text" id="authors" placeholder="Ivan Petrov" />
+      <label>Tags (через запятую)</label>
+      <input type="text" id="tags" placeholder="history, war" />
+      <label>Pin (Приоритет)</label>
+      <input type="number" id="pin" value="0" min="0" />
+    </div>
+
+    <!-- Блок 3: Флаги -->
+    <div class="card">
+      <label>Draft (Черновик)</label>
+      <select id="draft"><option value="false">false</option><option value="true">true</option></select>
+      <label>TOC (Оглавление)</label>
+      <select id="toc"><option value="true">true</option><option value="false">false</option></select>
+      <label>Lang</label>
+      <select id="lang"><option value="en">en</option><option value="ru">ru</option><option value="es">es</option></select>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>Content (HTML/Markdown) *</label>
+    <textarea id="content" rows="10" placeholder="Вставьте контент сюда..."></textarea>
+    <div class="error-msg">Контент обязателен для генерации файла</div>
+  </div>
+
+  <div class="actions">
+    <button id="btnGen" class="btn-gen" disabled>Generate Template</button>
+    <button id="btnDl" class="btn-dl" disabled>Download .md</button>
+    <button id="btnCopy" class="btn-dl" disabled>Copy to Clipboard</button>
+  </div>
+
+  <div id="status" class="status"></div>
+
+  <div class="preview-area">
+    <h3>Preview (Frontmatter + Content)</h3>
+    <pre id="preview"></pre>
+  </div>
+</div>
+
+<script>
+  // --- 1. UTILS: Транслитерация и Валидация ---
+  const RU_MAP = {'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'yo','ж':'zh','з':'z','и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f','х':'h','ц':'ts','ч':'ch','ш':'sh','щ':'sch','ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya'};
+  
+  function transliterate(str) {
+    return str.split('').map(c => RU_MAP[c.toLowerCase()] || c).join('');
+  }
+
+  function slugify(text) {
+    return transliterate(text)
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/[^\w\-]+/g, '')
+      .replace(/\-\-+/g, '-')
+      .replace(/^-+/, '')
+      .replace(/-+\$/, '');
+  }
+
+  function validateField(input, isValidFn) {
+    const val = input.value.trim();
+    const card = input.closest('.card');
+    const errorMsg = card.querySelector('.error-msg');
+    
+    if (!isValidFn(val)) {
+      input.classList.add('invalid');
+      input.classList.remove('valid');
+      card.classList.add('error');
+      return false;
+    } else {
+      input.classList.remove('invalid');
+      input.classList.add('valid');
+      card.classList.remove('error');
+      return true;
+    }
+  }
+
+  // --- 2. CORE: Логика конструктора шаблонов ---
+  function getTemplateData() {
+    const title = document.getElementById('title').value.trim();
+    const abbrlink = document.getElementById('abbrlink').value.trim() || slugify(title);
+    const authors = document.getElementById('authors').value.trim();
+    const tagsInput = document.getElementById('tags').value.trim();
+    const draft = document.getElementById('draft').value === 'true';
+    const pin = parseInt(document.getElementById('pin').value) || 0;
+    const toc = document.getElementById('toc').value === 'true';
+    const lang = document.getElementById('lang').value;
+    const contentRaw = document.getElementById('content').value.trim();
+
+    // Валидация перед возвратом данных
+    if (!title) throw new Error("Заголовок обязателен");
+    if (!/^[a-z0-9\-]+\$/.test(abbrlink)) throw new Error("Abbrlink должен содержать только a-z, 0-9, -");
+    if (!contentRaw) throw new Error("Контент обязателен");
+
+    const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(Boolean) : [];
+    
+    // Дата строго YYYY-MM-DD
+    const now = new Date().toISOString().split('T');
+
+    return {
+      title, abbrlink, authors, tags, draft, pin, toc, lang, now, contentRaw
+    };
+  }
+
+  function generateMarkdown(data) {
+    const fmLines = [
+      "---",
+      `title: \${data.title}`,
+      `abbrlink: \${data.abbrlink}`,
+      `published: \${data.now}`,
+      `updated: ''`,
+      `tags:`,
+      ...data.tags.map(t => `  - \${t}`),
+      `draft: \${data.draft}`,
+      `pin: \${data.pin}`,
+      `toc: \${data.toc}`,
+      `lang: '\${data.lang}'`,
+      `authorIds: '\${data.authors}'`,
+      "---"
+    ];
+
+    // Простой конвертер IMG (базовая версия)
+    let content = data.contentRaw;
+    // Здесь можно подключить более сложный парсер, если нужно
+    
+    return [...fmLines, '', content].join('\n');
+  }
+
+  // --- 3. UI: Обработка событий ---
+  const inputs = [
+    { id: 'title', fn: v => v.length > 0 },
+    { id: 'abbrlink', fn: v => /^[a-z0-9\-]+\$/.test(v) || v.length === 0 }, // Пустое ок, заполнится авто
+    { id: 'content', fn: v => v.length > 0 }
+  ];
+
+  inputs.forEach(item => {
+    const el = document.getElementById(item.id);
+    el.addEventListener('input', () => {
+      validateField(el, item.fn);
+      checkFormValidity();
+    });
+  });
+
+  // Автозаполнение abbrlink при вводе title
+  document.getElementById('title').addEventListener('input', (e) => {
+    const val = e.target.value.trim();
+    if (!document.getElementById('abbrlink').value.trim()) {
+      document.getElementById('abbrlink').value = slugify(val);
+      validateField(document.getElementById('abbrlink'), v => /^[a-z0-9\-]+\$/.test(v) || v.length === 0);
+    }
+  });
+
+  function checkFormValidity() {
+    const isValid = inputs.every(item => {
+      const val = document.getElementById(item.id).value.trim();
+      // Для abbrlink разрешаем пустое значение, так как оно автогенерируется
+      if (item.id === 'abbrlink' && val === '') return true; 
+      return item.fn(val);
+    });
+    
+    document.getElementById('btnGen').disabled = !isValid;
+  }
+
+  // --- 4. ACTIONS: Генерация и Скачивание ---
+  document.getElementById('btnGen').addEventListener('click', () => {
+    try {
+      const data = getTemplateData();
+      const md = generateMarkdown(data);
+      
+      document.getElementById('preview').textContent = md;
+      document.getElementById('status').className = 'status success';
+      document.getElementById('status').textContent = `Готово! Файл: \${data.abbrlink}.md`;
+      
+      const dlBtn = document.getElementById('btnDl');
+      const cpBtn = document.getElementById('btnCopy');
+      dlBtn.disabled = false;
+      cpBtn.disabled = false;
+
+      // Привязка действий к кнопкам (чтобы не дублировать логику)
+      dlBtn.onclick = () => {
+        const blob = new Blob([md], {type: 'text/plain'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `\${data.abbrlink}.md`;
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      cpBtn.onclick = () => {
+        navigator.clipboard.writeText(md).then(() => {
+          document.getElementById('status').textContent = "Скопировано!";
+        });
+      };
+
+    } catch (e) {
+      document.getElementById('status').className = 'status error';
+      document.getElementById('status').textContent = `Ошибка: \${e.message}`;
+    }
+  });
+
+  // Инициализация
+  checkFormValidity();
+</script>
+</body>
+</html>

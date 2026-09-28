@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MDX-комбайн</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 1rem 1.5rem 3rem;
+      background: #fafafa;
+      color: #222;
+    }
+    h1 { margin-bottom: 0.25rem; }
+    .subtitle { color: #888; font-size: 0.9rem; margin-bottom: 1.5rem; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    fieldset {
+      border: 1px solid #ddd;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin: 0;
+    }
+    legend { font-weight: 600; padding: 0 0.5rem; font-size: 0.95rem; }
+    label {
+      display: block;
+      margin-top: 0.75rem;
+      font-size: 0.85rem;
+      color: #555;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #ccc;
+      border-radius: 0.35rem;
+      font-size: 0.9rem;
+      font-family: inherit;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #0078d4;
+      box-shadow: 0 0 0 2px rgba(0,120,212,0.15);
+    }
+    textarea { resize: vertical; }
+    .full { grid-column: 1 / -1; }
+    .actions {
+      display: flex;
+      gap: 0.75rem;
+      margin: 1.25rem 0;
+    }
+    button {
+      padding: 0.7rem 1.5rem;
+      cursor: pointer;
+      border: none;
+      border-radius: 0.35rem;
+      font-size: 0.95rem;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+    #generateBtn { background: #0078d4; color: #fff; }
+    #generateBtn:hover { background: #005a9e; }
+    #downloadBtn, #copyBtn { background: #6c757d; color: #fff; }
+    #downloadBtn:not(:disabled):hover, #copyBtn:not(:disabled):hover { background: #5a6268; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .status {
+      margin: 0.5rem 0;
+      font-size: 0.9rem;
+      min-height: 1.2em;
+    }
+    .status.ok { color: #28a745; }
+    .status.err { color: #dc3545; }
+    .note {
+      font-size: 0.82rem;
+      color: #999;
+      margin-top: 0.35rem;
+    }
+    .preview {
+      background: #1e1e2e;
+      color: #cdd6f4;
+      padding: 1.25rem;
+      border-radius: 0.5rem;
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 500px;
+      overflow-y: auto;
+    }
+    .storage-note {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.82rem;
+      color: #28a745;
+      margin-bottom: 1rem;
+    }
+    .storage-note .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #28a745;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+  <h1>MDX-комбайн</h1>
+  <p class="subtitle">HTML &rarr; Markdown + frontmatter по шаблону Retypeset</p>
+
+  <div class="storage-note">
+    <span class="dot"></span>
+    <span id="storageHint">Поля сохраняются автоматически в браузере</span>
+  </div>
+
+  <div class="grid">
+    <fieldset>
+      <legend>Метаданные</legend>
+      <label for="title">Заголовок (title) *</label>
+      <input type="text" id="title" placeholder="Например: Как работает Astro" />
+
+      <label for="slug">Slug (авто из title)</label>
+      <input type="text" id="slug" placeholder="how-astro-works" readonly />
+
+      <label for="filename">Имя файла (без расширения)</label>
+      <input type="text" id="filename" placeholder="how-astro-works" />
+
+      <label for="description">Описание (description)</label>
+      <textarea id="description" rows="2" placeholder="Оставьте пустым — тема возьмёт первые 240 символов тела"></textarea>
+    </fieldset>
+
+    <fieldset>
+      <legend>Авторы и теги</legend>
+      <label for="authors">Авторы (через запятую)</label>
+      <input type="text" id="authors" placeholder="nevzorov-b-i, rsl" />
+
+      <label for="tags">Теги (через запятую)</label>
+      <input type="text" id="tags" placeholder="astro, mdx, tutorial" />
+
+      <label for="draft">Draft (черновик)</label>
+      <select id="draft">
+        <option value="false">false</option>
+        <option value="true">true</option>
+      </select>
+
+      <div style="display:flex; gap:1rem;">
+        <div style="flex:1">
+          <label for="pin">Pin</label>
+          <input type="number" id="pin" value="0" min="0" max="99" />
+        </div>
+        <div style="flex:1">
+          <label for="toc">TOC</label>
+          <select id="toc">
+            <option value="true">true</option>
+            <option value="false">false</option>
+          </select>
+        </div>
+      </div>
+    </fieldset>
+  </div>
+
+  <fieldset class="full" style="margin-bottom:1rem;">
+    <legend>Контент — вставьте HTML (Ctrl+V)</legend>
+    <textarea id="htmlContent" rows="8" placeholder="Скопируйте текст со страницы и вставьте сюда — браузер передаст HTML с форматированием"></textarea>
+    <p class="note">Конвертер превратит HTML-теги в Markdown: заголовки, списки, ссылки, жирный/курсив, код, изображения.</p>
+  </fieldset>
+
+  <div class="actions">
+    <button id="generateBtn">Создать .md</button>
+    <button id="downloadBtn" disabled>Скачать .md</button>
+    <button id="copyBtn" disabled>Копировать в буфер</button>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <h3>Результат</h3>
+  <div class="preview" id="preview"><span style="color:#6c7086;">Заполните поля и нажмите «Создать .md»</span></div>
+
+  <script>
+    // ── Поля для сохранения в localStorage ──
+    const STORAGE_KEY = 'mdx-combine';
+    const savedRaw = localStorage.getItem(STORAGE_KEY);
+    const saved = savedRaw ? JSON.parse(savedRaw) : {};
+
+    const persistFields = ['title', 'slug', 'filename', 'authors', 'tags', 'description', 'draft', 'pin', 'toc'];
+
+    function saveState() {
+      const state = {};
+      persistFields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) state[id] = el.value;
+      });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    // Восстановить сохранённые значения
+    persistFields.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && saved[id] !== undefined) el.value = saved[id];
+      if (el) el.addEventListener('input', saveState);
+    });
+
+    // ── Slug из title ──
+    const titleEl = document.getElementById('title');
+    const slugEl = document.getElementById('slug');
+    const filenameEl = document.getElementById('filename');
+
+    // Транслитерация кириллицы → латиница
+    const translitMap = {
+      'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'e','ж':'zh','з':'z','и':'i','й':'y',
+      'к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f',
+      'х':'h','ц':'ts','ч':'ch','ш':'sh','щ':'sch','ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya'
+    };
+
+    function slugify(text) {
+      return text
+        .toString()
+        .toLowerCase()
+        .split('')
+        .map(ch => translitMap[ch] !== undefined ? translitMap[ch] : ch)
+        .join('')
+        .trim()
+        .replace(/\s+/g, '-')
+        .replace(/[^\w\-]+/g, '')
+        .replace(/\-\-+/g, '-')
+        .replace(/^-+/, '')
+        .replace(/-+$/, '');
+    }
+
+    titleEl.addEventListener('input', () => {
+      const slug = slugify(titleEl.value);
+      slugEl.value = slug;
+      filenameEl.value = slug;
+      saveState();
+    });
+
+    // ── Конвертер HTML → Markdown ──
+    function htmlToMarkdown(html) {
+      if (!html || !html.trim()) return '';
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+
+      // Удаляем мусор
+      doc.querySelectorAll('script, style, meta, link').forEach(el => el.remove());
+
+      // Блоки кода (pre > code или просто pre)
+      doc.querySelectorAll('pre').forEach(pre => {
+        const code = pre.querySelector('code');
+        const content = code ? code.innerText : pre.innerText;
+        // Определяем язык, если есть class="language-xxx"
+        let lang = '';
+        if (code && code.className) {
+          const m = code.className.match(/language-(\w+)/);
+          if (m) lang = m[1];
+        }
+        pre.outerHTML = '\n\n```' + lang + '\n' + content.trim() + '\n```\n';
+      });
+
+      // Инлайн-код (после pre, чтобы не задеть)
+      doc.querySelectorAll('code').forEach(el => {
+        el.outerHTML = '`' + el.innerText.trim() + '`';
+      });
+
+      // Заголовки
+      ['h1','h2','h3','h4','h5','h6'].forEach(tag => {
+        doc.querySelectorAll(tag).forEach(el => {
+          const level = parseInt(tag.charAt(1));
+          el.outerHTML = '\n\n' + '#'.repeat(level) + ' ' + el.innerText.trim() + '\n';
+        });
+      });
+
+      // Жирный и курсив
+      doc.querySelectorAll('b, strong').forEach(el => {
+        el.outerHTML = '**' + el.innerText.trim() + '**';
+      });
+      doc.querySelectorAll('i, em').forEach(el => {
+        el.outerHTML = '*' + el.innerText.trim() + '*';
+      });
+
+      // Ссылки
+      doc.querySelectorAll('a').forEach(a => {
+        const href = a.getAttribute('href') || '';
+        const text = a.innerText.trim() || href;
+        a.outerHTML = '[' + text + '](' + href + ')';
+      });
+
+      // Изображения
+      doc.querySelectorAll('img').forEach(img => {
+        const src = img.getAttribute('src') || '';
+        const alt = img.getAttribute('alt') || '';
+        img.outerHTML = '![' + alt + '](' + src + ')';
+      });
+
+      // Маркированные списки
+      doc.querySelectorAll('ul').forEach(ul => {
+        const items = Array.from(ul.children).filter(li => li.tagName === 'LI');
+        let md = '\n';
+        items.forEach(li => {
+          md += '- ' + (li.innerText.trim() || '') + '\n';
+          // Вложенные списки
+          const nested = li.querySelector('ul, ol');
+          if (nested) {
+            // Оставляем как есть — простой случай
+          }
+        });
+        ul.outerHTML = md;
+      });
+
+      // Нумерованные списки
+      doc.querySelectorAll('ol').forEach(ol => {
+        const items = Array.from(ol.children).filter(li => li.tagName === 'LI');
+        let md = '\n';
+        items.forEach((li, i) => {
+          md += (i + 1) + '. ' + (li.innerText.trim() || '') + '\n';
+        });
+        ol.outerHTML = md;
+      });
+
+      // Параграфы
+      doc.querySelectorAll('p').forEach(el => {
+        el.outerHTML = '\n\n' + el.innerText.trim() + '\n';
+      });
+
+      // Цитаты
+      doc.querySelectorAll('blockquote').forEach(el => {
+        const lines = el.innerText.trim().split('\n');
+        const md = '\n' + lines.map(l => '> ' + l).join('\n') + '\n';
+        el.outerHTML = md;
+      });
+
+      // Горизонтальные линии
+      doc.querySelectorAll('hr').forEach(el => {
+        el.outerHTML = '\n\n---\n';
+      });
+
+      // Убираем лишние пустые строки
+      let text = doc.body.innerText;
+      text = text.replace(/\n{3,}/g, '\n\n').trim();
+      return text;
+    }
+
+    // ── Генерация .md ──
+    const generateBtn = document.getElementById('generateBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const previewEl = document.getElementById('preview');
+    const statusEl = document.getElementById('status');
+
+    let lastContent = '';
+
+    generateBtn.addEventListener('click', () => {
+      const title = titleEl.value.trim();
+      const slug = slugEl.value.trim();
+      const filename = filenameEl.value.trim() || slug;
+      const authorsRaw = document.getElementById('authors').value.trim();
+      const tagsRaw = document.getElementById('tags').value.trim();
+      const description = document.getElementById('description').value.trim();
+      const draft = document.getElementById('draft').value;
+      const pin = document.getElementById('pin').value || '0';
+      const toc = document.getElementById('toc').value;
+      const htmlContent = document.getElementById('htmlContent').value.trim();
+
+      if (!title) {
+        statusEl.textContent = 'Ошибка: заполните заголовок (title)';
+        statusEl.className = 'status err';
+        return;
+      }
+      if (!filename) {
+        statusEl.textContent = 'Ошибка: не удалось сгенерировать имя файла из title — заполните вручную';
+        statusEl.className = 'status err';
+        return;
+      }
+
+      const now = new Date().toISOString();
+
+      // Теги — YAML-массив
+      const tags = tagsRaw
+        ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean)
+        : ['Tag'];
+
+      let tagsYaml = 'tags:\n';
+      tags.forEach(t => { tagsYaml += '  - ' + t + '\n'; });
+
+      // Авторы — YAML-массив (формат из new-author-28-9-2026.txt)
+      let authorsYaml = '';
+      if (authorsRaw) {
+        const authorIds = authorsRaw.split(',').map(a => a.trim()).filter(Boolean);
+        if (authorIds.length > 0) {
+          authorsYaml = '\nauthorIds:\n';
+          authorIds.forEach(id => { authorsYaml += '  - ' + id + '\n'; });
+        }
+      }
+
+      // Frontmatter — точный формат из шаблона
+      const frontmatter =
+        '---\n' +
+        'title: ' + title + '\n' +
+        'published: ' + now + '\n' +
+        "description: '" + description + "'\n" +
+        "updated: ''\n" +
+        tagsYaml +
+        'draft: ' + draft + '\n' +
+        'pin: ' + pin + '\n' +
+        'toc: ' + toc + '\n' +
+        "lang: ''\n" +
+        "abbrlink: ''" + authorsYaml +
+        '\n---\n';
+
+      // Контент
+      const markdownBody = htmlToMarkdown(htmlContent);
+      lastContent = frontmatter + '\n' + markdownBody;
+
+      // Превью
+      previewEl.textContent = lastContent;
+
+      statusEl.textContent = '\u2705 Готово: ' + filename + '.md \u2014 ' + lastContent.length + ' символов';
+      statusEl.className = 'status ok';
+
+      downloadBtn.disabled = false;
+      copyBtn.disabled = false;
+
+      downloadBtn.onclick = () => {
+        const blob = new Blob([lastContent], { type: 'text/markdown;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename + '.md';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      };
+
+      copyBtn.onclick = () => {
+        navigator.clipboard.writeText(lastContent).then(() => {
+          statusEl.textContent = '\u2705 Скопировано в буфер обмена';
+          statusEl.className = 'status ok';
+        });
+      };
+
+      saveState();
+    });
+
+    // Подсказка про сохранение
+    if (savedRaw) {
+      document.getElementById('storageHint').textContent =
+        'Поля восстановлены из последнего заполнения (localStorage)';
+    }
+  </script>
+</body>
+</html>

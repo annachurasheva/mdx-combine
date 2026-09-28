@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>MDX-Комбайн: Финальная версия</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 1200px; margin: 0 auto; padding: 1.5rem; background: #f9f9f9; }
+    h1 { color: #2c3e50; margin-bottom: 1.5rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .form-group { background: white; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: #555; }
+    input, textarea, select { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+    textarea { min-height: 150px; resize: vertical; }
+    
+    /* Стили для обязательных полей */
+    input[required] { border-color: #c0392b; }
+    input[required].valid { border-color: #27ae60; }
+    
+    .controls-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+    
+    .actions { margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+    button { padding: 1rem 1.5rem; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; color: white; transition: opacity 0.2s; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; background: #ccc; }
+    
+    .btn-generate { background: #2c3e50; }
+    .btn-generate:not(:disabled):hover { background: #34495e; }
+    .btn-download { background: #27ae60; }
+    .btn-download:not(:disabled):hover { background: #219150; }
+    .btn-copy { background: #95a5a6; }
+    .btn-copy:not(:disabled):hover { background: #7f8c8d; }
+
+    .preview-container { margin-top: 2rem; }
+    .preview-label { font-weight: bold; margin-bottom: 0.5rem; display: block; }
+    .preview { background: #1e1e1e; color: #ecf0f1; padding: 1.5rem; border-radius: 8px; font-family: 'Consolas', monospace; white-space: pre-wrap; overflow-x: auto; max-height: 600px; overflow-y: auto; }
+    
+    .status { margin-top: 0.5rem; min-height: 1.2em; }
+    .error { color: #c0392b; }
+    .success { color: #27ae60; }
+    
+    .note { background: #e8f6f3; color: #16a085; padding: 1rem; border-radius: 4px; margin-top: 1rem; font-size: 0.9rem; border-left: 4px solid #16a085; }
+  </style>
+</head>
+<body>
+
+  <h1>MDX-Комбайн: Авто-транслит + Защита</h1>
+  <p>Версия, которая не даст создать файл с ошибками. Автоматически генерирует abbrlink из заголовка.</p>
+
+  <div class="grid">
+    <div class="form-group">
+      <label>Заголовок (Title) <span style="color:red">*</span></label>
+      <input type="text" id="title" placeholder="Например: Братская могила в Корпечи" required />
+      
+      <label>Slug (автозаполняется)</label>
+      <input type="text" id="slug" readonly />
+      
+      <label>Имя файла (без .md)</label>
+      <input type="text" id="filename" readonly />
+      
+      <label>Abbrlink (Авто или вручную) <span style="color:red">*</span></label>
+      <input type="text" id="abbrlink" placeholder="Оставите пустым — сделаю сам из заголовка" />
+      <small style="color:#666;">Только a-z, 0-9, дефис. Без заглавных!</small>
+    </div>
+
+    <div class="form-group">
+      <label>Авторы</label>
+      <input type="text" id="authors" placeholder="Ivan Petrov" />
+      <label>Теги (через запятую)</label>
+      <input type="text" id="tags" placeholder="history, war, kerch" />
+      <div class="controls-row">
+        <div style="flex:1">
+          <label>Draft</label>
+          <select id="draft">
+            <option value="false">false</option>
+            <option value="true">true</option>
+          </select>
+        </div>
+        <div style="flex:1">
+          <label>Pin</label>
+          <input type="number" id="pin" value="0" min="0" />
+        </div>
+        <div style="flex:1">
+          <label>TOC</label>
+          <select id="toc">
+            <option value="true">true</option>
+            <option value="false">false</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label>Контент (HTML или Markdown) <span style="color:red">*</span></label>
+    <textarea id="htmlContent" placeholder="Вставьте сюда контент из Web Archive / Gmail..." required></textarea>
+  </div>
+
+  <div class="note">
+    <strong>Как это работает теперь:</strong><br>
+    1. Введи заголовок. Abbrlink заполнится автоматически (транслит + slug). Можешь переписать вручную, но формат должен быть строгим.<br>
+    2. Кнопка "Создать" станет активной только когда все обязательные поля заполнены.<br>
+    3. Дата будет в формате YYYY-MM-DD (без времени), чтобы не ломать сборку.
+  </div>
+
+  <div class="actions">
+    <button id="generateBtn" class="btn-generate" disabled>Создать .md</button>
+    <button id="downloadBtn" class="btn-download" disabled>Скачать .md</button>
+    <button id="copyBtn" class="btn-copy" disabled>Копировать в буфер</button>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <div class="preview-container">
+    <span class="preview-label">Результат (Frontmatter + Content):</span>
+    <div class="preview" id="preview"></div>
+  </div>
+
+  <script>
+    // --- Транслитерация (Русский -> Latin) ---
+    const ruToEnMap = {
+      'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo', 'ж': 'zh', 'з': 'z', 'и': 'i',
+      'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't',
+      'у': 'u', 'ф': 'f', 'х': 'h', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'sch', 'ъ': '', 'ы': 'y',
+      'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+      'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D', 'Е': 'E', 'Ё': 'Yo', 'Ж': 'Zh', 'З': 'Z', 'И': 'I',
+      'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M', 'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T',
+      'У': 'U', 'Ф': 'F', 'Х': 'H', 'Ц': 'Ts', 'Ч': 'Ch', 'Ш': 'Sh', 'Щ': 'Sch', 'Ъ': '', 'Ы': 'Y',
+      'Ь': '', 'Э': 'E', 'Ю': 'Yu', 'Я': 'Ya'
+    };
+
+    function transliterate(str) {
+      return str.split('').map(char => ruToEnMap[char] || char).join('');
+    }
+
+    function slugify(text) {
+      return transliterate(text)
+        .toString()
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '-')
+        .replace(/[^\w\-]+/g, '') // Удаляем всё кроме букв, цифр и дефиса
+        .replace(/\-\-+/g, '-')
+        .replace(/^-+/, '')
+        .replace(/-+\$/, '');
+    }
+
+    // --- Элементы DOM ---
+    const titleEl = document.getElementById('title');
+    const slugEl = document.getElementById('slug');
+    const filenameEl = document.getElementById('filename');
+    const abbrlinkEl = document.getElementById('abbrlink');
+    const generateBtn = document.getElementById('generateBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const previewEl = document.getElementById('preview');
+    const statusEl = document.getElementById('status');
+
+    // --- Логика автозаполнения ---
+    function updateFields() {
+      const title = titleEl.value.trim();
+      const slug = slugify(title);
+      
+      slugEl.value = slug;
+      filenameEl.value = slug;
+
+      // АВТО-ЗАПОЛНЕНИЕ ABBRLINK
+      // Если пользователь НЕ вводил ничего в abbrlink, ставим туда slug.
+      // Если вводил - оставляем как есть (защита от перезаписи ручного ввода).
+      if (!abbrlinkEl.value.trim()) {
+        abbrlinkEl.value = slug;
+      }
+
+      validateForm();
+    }
+
+    // --- Валидация (Защита от дурака) ---
+    function validateForm() {
+      const title = titleEl.value.trim();
+      const abbrlink = abbrlinkEl.value.trim();
+      const content = document.getElementById('htmlContent').value.trim();
+      
+      const abbrlinkRegex = /^[a-z0-9\-]+\$/;
+
+      let isValid = true;
+      let errorMsg = "";
+
+      if (!title) {
+        isValid = false;
+        errorMsg = "Нужен заголовок!";
+      } else if (!abbrlink) {
+        isValid = false;
+        errorMsg = "Нужен abbrlink (заполнится автоматически из заголовка)!";
+      } else if (!abbrlinkRegex.test(abbrlink)) {
+        isValid = false;
+        errorMsg = "Abbrlink: только строчные буквы, цифры и дефисы!";
+      } else if (!content) {
+        isValid = false;
+        errorMsg = "Нужен контент!";
+      }
+
+      if (isValid) {
+        generateBtn.disabled = false;
+        statusEl.textContent = "";
+        statusEl.className = "status";
+      } else {
+        generateBtn.disabled = true;
+        statusEl.textContent = "Ошибка: " + errorMsg;
+        statusEl.className = "status error";
+      }
+    }
+
+    // --- Обработчики событий ---
+    titleEl.addEventListener('input', updateFields);
+    abbrlinkEl.addEventListener('input', validateForm); // Если вручную правим abbrlink, проверяем валидность
+    document.getElementById('htmlContent').addEventListener('input', validateForm);
+
+    // Инициализация при загрузке
+    updateFields();
+
+    // --- Конвертер HTML -> Markdown ---
+    function htmlToMarkdown(html) {
+      if (!html) return '';
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      doc.querySelectorAll('script, style').forEach(el => el.remove());
+
+      // Заголовки
+      doc.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(el => {
+        const level = parseInt(el.tagName.substring(1));
+        el.outerHTML = '\n\n' + '#'.repeat(level) + ' ' + el.innerText.trim() + '\n';
+      });
+
+      // Параграфы
+      doc.querySelectorAll('p').forEach(el => {
+        el.outerHTML = '\n\n' + el.innerText.trim() + '\n';
+      });
+
+      // Списки
+      doc.querySelectorAll('ul, ol').forEach(list => {
+        const items = Array.from(list.children);
+        const isOrdered = list.tagName === 'OL';
+        let md = '\n';
+        items.forEach((li, i) => {
+          const prefix = isOrdered ? `\${i + 1}. ` : '- ';
+          md += prefix + (li.innerText.trim() || '') + '\n';
+        });
+        list.outerHTML = md;
+      });
+
+      // Ссылки
+      doc.querySelectorAll('a').forEach(a => {
+        const href = a.getAttribute('href') || '';
+        const text = a.innerText.trim() || href;
+        a.outerHTML = `[${text}](${href})`;
+      });
+
+      // Жирный, курсив, код
+      doc.querySelectorAll('b, strong').forEach(el => el.outerHTML = `**\${el.innerText.trim()}**`);
+      doc.querySelectorAll('i, em').forEach(el => el.outerHTML = `*\${el.innerText.trim()}*`);
+      doc.querySelectorAll('code').forEach(el => {
+        if (el.parentElement && el.parentElement.tagName === 'PRE') {
+          el.outerHTML = el.innerText;
+        } else {
+          el.outerHTML = ``\`\${el.innerText.trim()}\``;
+        }
+      });
+      doc.querySelectorAll('pre').forEach(pre => {
+        const code = pre.querySelector('code');
+        const content = code ? code.innerText.trim() : pre.innerText.trim();
+        pre.outerHTML = '\n\n```\n' + content + '\n```\n';
+      });
+
+      // Картинки
+      doc.querySelectorAll('img').forEach(img => {
+        let src = img.getAttribute('src') || '';
+        const alt = img.getAttribute('alt') || 'Изображение';
+
+        // Чистка битых ссылок Web Archive
+        if (src.includes('im_/')) {
+          src = src.replace('im_/', '');
+        }
+
+        if (src.startsWith('http://') || src.startsWith('https://')) {
+          // Оставляем как есть
+        } else {
+          src = '/assets/' + src.replace(/^\/+/, '');
+        }
+
+        img.outerHTML = `![${alt}](${src})`;
+      });
+
+      return doc.body.innerHTML.replace(/\n+/g, '\n').trim();
+    }
+
+    // --- Генерация файла ---
+    generateBtn.addEventListener('click', () => {
+      const title = titleEl.value.trim();
+      const abbrlink = abbrlinkEl.value.trim();
+      const authors = document.getElementById('authors').value.trim();
+      const tagsInput = document.getElementById('tags').value.trim();
+      const draft = document.getElementById('draft').value === 'true';
+      const pin = parseInt(document.getElementById('pin').value) || 0;
+      const toc = document.getElementById('toc').value === 'true';
+      const htmlContent = document.getElementById('htmlContent').value.trim();
+      const filename = document.getElementById('filename').value.trim();
+
+      // Финальная проверка перед генерацией (на случай гонки состояний)
+      if (!title || !abbrlink || !htmlContent) {
+        statusEl.textContent = "Ошибка: Заполните все обязательные поля!";
+        statusEl.className = "status error";
+        return;
+      }
+
+      // Дата строго YYYY-MM-DD
+      const now = new Date().toISOString().split('T');
+      
+      const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(Boolean) : ;
+
+      const frontmatter = `---
+title: \${title}
+abbrlink: \${abbrlink}
+published: \${now}
+updated: ''
+tags:
+${tags.map(t => `  - ${t}`).join('\n')}
+draft: \${draft}
+pin: \${pin}
+toc: \${toc}
+lang: ''
+authorIds: '\${authors}'
+---
+`;
+
+      const markdownContent = htmlToMarkdown(htmlContent);
+      const fullContent = frontmatter + '\n' + markdownContent;
+
+      // Вывод в превью
+      previewEl.textContent = fullContent;
+      
+      // Активация кнопок скачивания/копирования
+      downloadBtn.disabled = false;
+      copyBtn.disabled = false;
+      
+      statusEl.textContent = `Готово! Файл: \${filename}.md`;
+      statusEl.className = "status success";
+
+      // Логика скачивания
+      downloadBtn.onclick = () => {
+        const blob = new Blob([fullContent], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `\${filename}.md`;
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      // Логика копирования
+      copyBtn.onclick = () => {
+        navigator.clipboard.writeText(fullContent).then(() => {
+          statusEl.textContent = "Скопировано в буфер обмена!";
+        }).catch(err => {
+          statusEl.textContent = "Не удалось скопировать (возможно, нет прав браузера).";
+          console.error('Copy failed', err);
+        });
+      };
+    });
+  </script>
+</body>
+</html>

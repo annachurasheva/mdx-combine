@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>MDX Template Builder v2</title>
+  <style>
+    :root { --primary: #2c3e50; --success: #27ae60; --error: #c0392b; --bg: #f4f6f8; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); padding: 2rem; }
+    .container { max-width: 1000px; margin: 0 auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; }
+    .card { background: #f9f9f9; padding: 1rem; border-radius: 6px; border: 1px solid #eee; }
+    label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: #333; }
+    input, textarea, select { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; transition: border 0.2s; }
+    input:focus, textarea:focus { outline: none; border-color: var(--primary); }
+    input.invalid { border-color: var(--error); background-color: #fdf2f2; }
+    input.valid, textarea.valid { border-color: var(--success); }
+    input.invalid, textarea.invalid { border-color: var(--error); background-color: #fdf2f2; }
+    .error-msg { color: var(--error); font-size: 0.85rem; margin-top: 0.25rem; display: none; }
+    .card.error .error-msg { display: block; }
+    small { display: block; color: #666; margin-top: 0.25rem; }
+    .actions { margin-top: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+    button { padding: 0.8rem 1.5rem; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; color: white; transition: opacity 0.2s; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; background: #ccc; }
+    .btn-gen { background: var(--primary); }
+    .btn-dl { background: var(--success); }
+    .btn-reset { background: #95a5a6; }
+    .preview-area { margin-top: 2rem; }
+    pre { background: #1e1e1e; color: #fff; padding: 1.5rem; border-radius: 6px; overflow-x: auto; font-size: 0.9rem; white-space: pre-wrap; }
+    .status { margin-top: 1rem; padding: 0.5rem; border-radius: 4px; display: none; }
+    .status.success { background: #d4edda; color: #155724; display: block; }
+    .status.error { background: #f8d7da; color: #721c24; display: block; }
+    .hint { background: #e8f6f3; border-left: 4px solid #16a085; padding: 0.75rem 1rem; border-radius: 4px; font-size: 0.9rem; margin-bottom: 1.5rem; }
+    .chk { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; color: #333; }
+    .chk input { width: auto; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>MDX Template Constructor</h1>
+  <p>Генератор frontmatter для Astro/Retypeset. Защита от пустых полей, память последнего заполнения.</p>
+
+  <div class="hint">
+    <strong>description намеренно отсутствует</strong> — его формирует тема из <code>toc</code>.<br>
+    <code>published</code> пишется как <code>YYYY-MM-DD</code> (без времени и Z — иначе сборка падает).<br>
+    <code>toc</code>: выкл / 128 / 256 — объём авто-description.
+  </div>
+
+  <div class="grid">
+    <!-- 1: Title -->
+    <div class="card">
+      <label for="title">Title (Заголовок) *</label>
+      <input type="text" id="title" placeholder="История села Корпечь..." />
+      <div class="error-msg">Заголовок обязателен</div>
+    </div>
+
+    <!-- 2: Abbrlink (отдельная карточка, чтобы ошибка не врала про slug при пустом title) -->
+    <div class="card">
+      <label for="abbrlink">Abbrlink (авто из Title) *</label>
+      <input type="text" id="abbrlink" placeholder="auto..." />
+      <small>Только a-z, 0-9, дефис. Заглавных и подчёркиваний быть не должно.</small>
+      <div class="error-msg">Нужен валидный slug: a-z, 0-9, дефис</div>
+    </div>
+
+    <!-- 3: Метаданные -->
+    <div class="card">
+      <label for="authors">Authors (через запятую)</label>
+      <input type="text" id="authors" placeholder="nevzorov-b-i" />
+      <label for="tags">Tags (через запятую)</label>
+      <input type="text" id="tags" placeholder="history, war" />
+      <label for="pin">Pin</label>
+      <input type="number" id="pin" value="0" min="0" />
+    </div>
+
+    <!-- 4: Флаги -->
+    <div class="card">
+      <label for="draft">Draft</label>
+      <select id="draft"><option value="false">false</option><option value="true">true</option></select>
+      <label for="toc">TOC / объём description</label>
+      <select id="toc">
+        <option value="false">выкл</option>
+        <option value="128">128 знаков</option>
+        <option value="256">256 знаков</option>
+      </select>
+      <label for="lang">Lang</label>
+      <select id="lang"><option value="">пусто</option><option value="ru">ru</option><option value="en">en</option><option value="es">es</option></select>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:1.5rem">
+    <label for="content">Content (HTML или Markdown) *</label>
+    <textarea id="content" rows="12" placeholder="Вставьте контент из Web Archive / Gmail..."></textarea>
+    <label class="chk" style="margin-top:0.5rem">
+      <input type="checkbox" id="autoConvert" checked />
+      Конвертировать HTML в Markdown (если вставлен HTML, а не Markdown)
+    </label>
+    <div class="error-msg">Контент обязателен</div>
+  </div>
+
+  <div class="actions">
+    <button id="btnGen" class="btn-gen" disabled>Generate Template</button>
+    <button id="btnDl" class="btn-dl" disabled>Download .md</button>
+    <button id="btnCopy" class="btn-dl" disabled>Copy to Clipboard</button>
+    <button id="btnReset" class="btn-reset">Сбросить память</button>
+  </div>
+
+  <div id="status" class="status"></div>
+
+  <div class="preview-area">
+    <h3>Preview (Frontmatter + Content)</h3>
+    <pre id="preview"></pre>
+  </div>
+</div>
+
+<script>
+  // ============ 1. UTILS ============
+  const RU_MAP = {'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'yo','ж':'zh','з':'z','и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f','х':'h','ц':'ts','ч':'ch','ш':'sh','щ':'sch','ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya'};
+
+  function transliterate(str) {
+    return str.toLowerCase().split('').map(c => RU_MAP[c] || c).join('');
+  }
+
+  // Патч 8: только a-z0-9 и дефис (подчёркивание валидатор abbrlink отвергает)
+  function slugify(text) {
+    const slug = transliterate(String(text))
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]+/g, '')
+      .replace(/-{2,}/g, '-')
+      .replace(/^-+/, '')
+      .replace(/-+$/, '');
+    return slug || 'post';
+  }
+
+  // Патч 3: корректная регулярка (без \$ внутри)
+  const ABBRLINK_RE = /^[a-z0-9-]+$/;
+
+  function validateField(input, isValidFn) {
+    const val = input.value.trim();
+    const card = input.closest('.card');
+    if (!isValidFn(val)) {
+      input.classList.add('invalid');
+      input.classList.remove('valid');
+      if (card) card.classList.add('error');
+      return false;
+    }
+    input.classList.remove('invalid');
+    input.classList.add('valid');
+    if (card) card.classList.remove('error');
+    return true;
+  }
+
+  function setStatus(kind, text) {
+    const el = document.getElementById('status');
+    el.className = 'status ' + kind;
+    el.textContent = text;
+  }
+
+  // ============ 2. ПАМЯТЬ ПОСЛЕДНЕГО ЗАПОЛНЕНИЯ ============
+  // title / abbrlink / content НЕ сохраняем: иначе следующий пост унаследует чужой slug.
+  const PERSIST = ['authors', 'tags', 'pin', 'draft', 'toc', 'lang', 'autoConvert'];
+
+  function saveField(id) {
+    const el = document.getElementById(id);
+    const value = el.type === 'checkbox' ? (el.checked ? '1' : '0') : el.value;
+    try { localStorage.setItem('mdxc:' + id, value); } catch (e) {}
+  }
+
+  function restoreFields() {
+    PERSIST.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      let saved = null;
+      try { saved = localStorage.getItem('mdxc:' + id); } catch (e) {}
+      if (saved === null || saved === '') return;
+      if (el.type === 'checkbox') el.checked = saved === '1';
+      else el.value = saved;
+      el.addEventListener('change', () => saveField(id));
+    });
+  }
+
+  document.getElementById('btnReset').addEventListener('click', () => {
+    PERSIST.forEach(id => { try { localStorage.removeItem('mdxc:' + id); } catch (e) {} });
+    document.getElementById('authors').value = '';
+    document.getElementById('tags').value = '';
+    document.getElementById('pin').value = '0';
+    document.getElementById('draft').value = 'false';
+    document.getElementById('toc').value = 'false';
+    document.getElementById('lang').value = '';
+    setStatus('success', 'Память сброшена — поля по умолчанию.');
+  });
+
+  // ============ 3. КОНВЕРТЕР HTML -> MARKDOWN ============
+  const HTML_HINT = /<(h[1-6]|img|ul|ol|table|blockquote|p|br)\b/i;
+
+  function looksLikeHtml(text) {
+    return HTML_HINT.test(text);
+  }
+
+  function htmlToMarkdown(html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    doc.querySelectorAll('script, style').forEach(el => el.remove());
+
+    doc.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(el => {
+      const level = parseInt(el.tagName.substring(1), 10);
+      el.outerHTML = '\n\n' + '#'.repeat(level) + ' ' + el.textContent.trim() + '\n';
+    });
+
+    doc.querySelectorAll('p').forEach(el => {
+      el.outerHTML = '\n\n' + el.textContent.trim() + '\n';
+    });
+
+    doc.querySelectorAll('blockquote').forEach(el => {
+      const text = el.textContent.trim().replace(/\n/g, '\n> ');
+      el.outerHTML = '\n\n> ' + text + '\n';
+    });
+
+    doc.querySelectorAll('ul, ol').forEach(list => {
+      const items = Array.from(list.children).filter(li => li.tagName === 'LI');
+      const ordered = list.tagName === 'OL';
+      let md = '\n';
+      items.forEach((li, i) => {
+        md += (ordered ? (i + 1) + '. ' : '- ') + li.textContent.trim() + '\n';
+      });
+      list.outerHTML = md;
+    });
+
+    doc.querySelectorAll('b, strong').forEach(el => el.outerHTML = '**' + el.textContent.trim() + '**');
+    doc.querySelectorAll('i, em').forEach(el => el.outerHTML = '*' + el.textContent.trim() + '*');
+
+    doc.querySelectorAll('pre').forEach(pre => {
+      const code = pre.querySelector('code');
+      const content = (code ? code.textContent : pre.textContent).trim();
+      pre.outerHTML = '\n\n```\n' + content + '\n```\n';
+    });
+
+    doc.querySelectorAll('code').forEach(el => {
+      if (el.parentElement && el.parentElement.tagName === 'PRE') return;
+      el.outerHTML = '`' + el.textContent.trim() + '`';
+    });
+
+    // Картинки: чистим битый суффикс web-archive im_/ и сохраняем alt
+    doc.querySelectorAll('img').forEach(img => {
+      let src = img.getAttribute('src') || '';
+      const alt = (img.getAttribute('alt') || 'Изображение').replace(/[[\]]/g, '');
+      src = src.replace('im_/', '');
+      if (!(src.startsWith('http://') || src.startsWith('https://'))) {
+        src = '/assets/' + src.replace(/^\/+/, '');
+      }
+      img.outerHTML = '![' + alt + '](' + src + ')';
+    });
+
+    doc.querySelectorAll('a').forEach(a => {
+      const href = a.getAttribute('href') || '';
+      if (a.querySelector('img')) { a.outerHTML = a.innerHTML; return; }
+      const text = a.textContent.trim() || href;
+      a.outerHTML = '[' + text + '](' + href + ')';
+    });
+
+    doc.querySelectorAll('br').forEach(el => el.outerHTML = '  \n');
+    doc.querySelectorAll('hr').forEach(el => el.outerHTML = '\n---\n');
+
+    return doc.body.textContent.replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  // ============ 4. CORE: СБОР ДАННЫХ ============
+  function getTemplateData() {
+    const title = document.getElementById('title').value.trim();
+    const abbrlink = document.getElementById('abbrlink').value.trim() || slugify(title);
+    const authors = document.getElementById('authors').value.trim();
+    const tagsInput = document.getElementById('tags').value.trim();
+    const draft = document.getElementById('draft').value === 'true';
+    const pin = parseInt(document.getElementById('pin').value, 10) || 0;
+    const toc = document.getElementById('toc').value;          // 'false' | '128' | '256'
+    const lang = document.getElementById('lang').value;
+    let contentRaw = document.getElementById('content').value.trim();
+    const autoConvert = document.getElementById('autoConvert').checked;
+
+    if (!title) throw new Error('Заголовок обязателен');
+    if (!ABBRLINK_RE.test(abbrlink)) throw new Error('Abbrlink невалиден: только a-z, 0-9, дефис');
+    if (!contentRaw) throw new Error('Контент обязателен');
+
+    let converted = false;
+    if (autoConvert && looksLikeHtml(contentRaw)) {
+      contentRaw = htmlToMarkdown(contentRaw);
+      converted = true;
+    }
+
+    const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+    // Патч 1: строка, а не массив -> YYYY-MM-DD
+    const now = new Date().toISOString().split('T')[0];
+
+    return { title, abbrlink, authors, tags, draft, pin, toc, lang, now, contentRaw, converted };
+  }
+
+  function generateMarkdown(data) {
+    const tocOut = data.toc === 'false' ? 'false' : data.toc;
+
+    const fmLines = [
+      '---',
+      'title: ' + data.title,
+      'published: ' + data.now,
+      "updated: ''",
+      'abbrlink: ' + data.abbrlink,
+      'tags:',
+      ...(data.tags.length ? data.tags.map(t => '  - ' + t) : ['  - Tag']),
+      'draft: ' + data.draft,
+      'pin: ' + data.pin,
+      'toc: ' + tocOut,
+      "lang: '" + data.lang + "'",
+      // Патч 5: authorIds списком, как ждёт тема
+      ...(data.authors
+        ? ['authorIds:', ...data.authors.split(',').map(a => '  - ' + a.trim())]
+        : ['authorIds:']),
+      '---'
+    ];
+
+    return [...fmLines, '', data.contentRaw].join('\n');
+  }
+
+  // ============ 5. UI ============
+  const titleEl = document.getElementById('title');
+  const abbrEl = document.getElementById('abbrlink');
+  const contentEl = document.getElementById('content');
+
+  const inputs = [
+    { el: titleEl,   fn: v => v.length > 0 },
+    { el: abbrEl,    fn: v => v.length === 0 || ABBRLINK_RE.test(v) },
+    { el: contentEl, fn: v => v.length > 0 }
+  ];
+
+  function checkFormValidity() {
+    const ok = inputs.every(item => {
+      const v = item.el.value.trim();
+      if (item.el === abbrEl && v === '') return true;   // автозаполнится
+      return item.fn(v);
+    });
+    document.getElementById('btnGen').disabled = !ok;
+  }
+
+  // Патч 10: любая правка гасит устаревший результат
+  function invalidateResult() {
+    document.getElementById('btnDl').disabled = true;
+    document.getElementById('btnCopy').disabled = true;
+    const st = document.getElementById('status');
+    st.className = 'status';
+    st.textContent = '';
+  }
+
+  inputs.forEach(item => {
+    item.el.addEventListener('input', () => {
+      validateField(item.el, item.fn);
+      checkFormValidity();
+      invalidateResult();
+    });
+  });
+
+  ['draft', 'toc', 'lang', 'pin', 'autoConvert'].forEach(id => {
+    document.getElementById(id).addEventListener('change', invalidateResult);
+  });
+  document.getElementById('authors').addEventListener('input', invalidateResult);
+  document.getElementById('tags').addEventListener('input', invalidateResult);
+
+  // Автозаполнение abbrlink: только пока поле пустое (ручной ввод не перетираем)
+  titleEl.addEventListener('input', () => {
+    if (!abbrEl.value.trim()) {
+      const t = titleEl.value.trim();
+      abbrEl.value = t ? slugify(t) : '';
+      validateField(abbrEl, v => v.length === 0 || ABBRLINK_RE.test(v));
+    }
+  });
+
+  // ============ 6. ACTIONS ============
+  document.getElementById('btnGen').addEventListener('click', () => {
+    try {
+      const data = getTemplateData();
+      const md = generateMarkdown(data);
+      const filename = data.abbrlink + '.md';
+
+      document.getElementById('preview').textContent = md;
+      setStatus('success', 'Готово: ' + filename + ' — ' + md.length + ' символов'
+        + (data.converted ? ' (HTML сконвертирован)' : ''));
+
+      const dlBtn = document.getElementById('btnDl');
+      const cpBtn = document.getElementById('btnCopy');
+      dlBtn.disabled = false;
+      cpBtn.disabled = false;
+
+      // Патч 4: вставка в DOM + отложенный отзыв URL
+      dlBtn.onclick = () => {
+        const blob = new Blob([md], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      };
+
+      cpBtn.onclick = () => {
+        navigator.clipboard.writeText(md)
+          .then(() => setStatus('success', 'Скопировано в буфер обмена.'))
+          .catch(() => setStatus('error', 'Браузер не дал доступ к буферу — выдели текст в Preview вручную.'));
+      };
+    } catch (e) {
+      setStatus('error', 'Ошибка: ' + e.message);
+    }
+  });
+
+  // ============ 7. INIT ============
+  restoreFields();
+  inputs.forEach(item => validateField(item.el, item.fn));
+  checkFormValidity();
+</script>
+</body>
+</html>
