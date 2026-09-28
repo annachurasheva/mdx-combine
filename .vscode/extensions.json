@@ -1,0 +1,9 @@
+{
+  "recommendations": [
+    "formulahendry.auto-rename-tag",
+    "ritwickdey.liveserver",
+    "dbaeumer.vscode-eslint",
+    "editorconfig.editorconfig",
+    "yzhang.markdown-all-in-one"
+  ]
+}

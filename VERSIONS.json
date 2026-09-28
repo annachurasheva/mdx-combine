@@ -1,0 +1,24 @@
+{
+  "current": {
+    "version": "1.0.0",
+    "takenAt": "2026-09-28"
+  },
+  "history": [
+    {
+      "version": "1.0.0",
+      "takenAt": "2026-09-28",
+      "note": "все 10 патчей, дата YYYY-MM-DD, toc 3 состояния, authorIds списком"
+    }
+  ],
+  "retired": [
+    {
+      "version": "0.7",
+      "reason": "артефакты $ — подстановки не работали",
+      "file": "archive/mdx-combine7_html.txt"
+    },
+    {
+      "version": "0.4",
+      "reason": "published с T и Z — ронял сборку"
+    }
+  ]
+}

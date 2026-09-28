@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Doctor · проверка комбайна</title>
+<style>
+  body { font: 14px/1.5 system-ui, sans-serif; margin: 2rem auto; max-width: 900px; padding: 0 1rem; }
+  .drop { border: 2px dashed #bbb; border-radius: 8px; padding: 2rem; text-align: center; color: #666; }
+  .drop.on { border-color: #27ae60; background: #f2fbf6; }
+  table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; }
+  th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid #eee; vertical-align: top; }
+  .ERROR { color: #c0392b; font-weight: 700; }
+  .WARN { color: #b9770e; font-weight: 600; }
+  .PASS { color: #27ae60; }
+  code { background: #f4f4f4; padding: .1rem .3rem; border-radius: 3px; }
+  h2 { margin-top: 2rem; }
+</style>
+</head>
+<body>
+<h1>Doctor</h1>
+<p>Перетащи сюда <code>mdx-combine.html</code> (можно несколько файлов). Проверяется то, что реально ломало сборку: экранирование, формат даты, <code>toc</code>, <code>authorIds</code>, битые ссылки на <code>id</code>, незакрытые шаблонные литералы.</p>
+<div class="drop" id="drop">Перетащи файлы сюда или нажми и выбери</div>
+<input type="file" id="pick" multiple accept=".html,.htm,.txt" hidden>
+<div id="out"></div>
+
+<script>
+const CHECKS = [
+  ['ERROR', 'escape-artifacts', '\\$ — подстановки печатаются текстом',
+   s => !/\\\$/.test(s)],
+  ['ERROR', 'date-format', "published без [0]: попадёт время и Z",
+   s => !/\.split\('T'\)(?!\[0\])/.test(s)],
+  ['ERROR', 'toc-three-states', 'toc не даёт три состояния (128/256)',
+   s => /<option value="128">/.test(s) && /<option value="256">/.test(s)],
+  ['ERROR', 'authorids-list', 'authorIds строкой вместо YAML-списка',
+   s => /authorIds:/test(s) && /\n\s*-\s*\$\{/.test(s)],
+  ['WARN', 'description-forbidden', 'есть ключ description',
+   s => !/`description:/test(s)],
+  ['WARN', 'persist', 'нет localStorage',
+   s => /localStorage/.test(s)],
+  ['WARN', 'download-dom', 'ссылка не вставляется в DOM перед click()',
+   s => /body\.appendChild\(a\)/.test(s)],
+  ['WARN', 'revoke-timing', 'revokeObjectURL сразу после click()',
+   s => !/revokeObjectURL/.test(s) || /setTimeout\([^)]*revokeObjectURL/.test(s)],
+  ['WARN', 'im-clean', 'нет очистки im_/ для Web Archive',
+   s => /im_\//.test(s)],
+  ['WARN', 'build-stamp', 'нет отметки версии',
+   s => /build:\s*[\d.]+/.test(s)],
+]
+
+function analyse(name, text) {
+  const rows = []
+  for (const [lvl, code, msg, fn] of CHECKS) {
+    if (!fn(text)) rows.push([lvl, code, msg])
+  }
+  // id: объявленные против используемых
+  const declared = new Map()
+  for (const m of text.matchAll(/\sid="([^"]+)"/g))
+    declared.set(m[1], (declared.get(m[1]) || 0) + 1)
+  for (const [id, n] of declared)
+    if (n > 1) rows.push(['ERROR', 'dup-id', `id="${id}" дублируется (${n})`])
+  for (const m of text.matchAll(/getElementById\(\s*['"]([^'"]+)['"]\s*\)/g))
+    if (!declared.has(m[1]))
+      rows.push(['ERROR', 'missing-id', `нет элемента id="${m[1]}" — getElementById → null`])
+  // нечётные обратные кавычки = незакрытый шаблон
+  const ticks = (text.match(/`/g) || []).length
+  if (ticks % 2) rows.push(['ERROR', 'odd-backtick', `нечётное число \` (${ticks})`])
+  // title и abbrlink в одной карточке
+  const iT = text.indexOf('id="title"'), iA = text.indexOf('id="abbrlink"')
+  if (iT > 0 && iA > 0 &&
+      text.lastIndexOf('<div class="card"', iT) === text.lastIndexOf('<div class="card"', iA))
+    rows.push(['WARN', 'shared-error-msg', 'title и abbrlink в одной карточке'])
+  return rows
+}
+
+const drop = document.getElementById('drop')
+const pick = document.getElementById('pick')
+const out = document.getElementById('out')
+
+drop.onclick = () => pick.click()
+pick.onchange = () => render(pick.files)
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('on') }
+drop.ondragleave = () => drop.classList.remove('on')
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('on'); render(e.dataTransfer.files) }
+
+function render(files) {
+  const jobs = [...files].map(f => f.text().then(t => [f.name, t]))
+  Promise.all(jobs).then(entries => {
+    out.innerHTML = entries.map(([name, text]) => {
+      const rows = analyse(name, text)
+      const err = rows.filter(r => r[0] === 'ERROR').length
+      const head = err
+        ? `<h2>⛔ ${name} — ${err} ошибок</h2>`
+        : `<h2 class="PASS">✔ ${name} — критичных ошибок нет</h2>`
+      if (!rows.length) return head + '<p class="PASS">Все проверки пройдены.</p>'
+      return head + '<table><tr><th>Уровень</th><th>Код</th><th>Что не так</th></tr>' +
+        rows.map(([l, c, m]) => `<tr><td class="${l}">${l}</td><td><code>${c}</code></td><td>${m}</td></tr>`).join('') +
+        '</table>'
+    }).join('')
+  })
+}
+</script>
+</body>
+</html>

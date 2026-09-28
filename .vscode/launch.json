@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Комбайн в Edge",
+      "type": "pwa-msedge",
+      "request": "launch",
+      "file": "${workspaceFolder}/src/mdx-combine.html",
+      "webRoot": "${workspaceFolder}",
+      "sourceMaps": false,
+      "trace": false
+    }
+  ]
+}

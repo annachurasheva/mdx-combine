@@ -1,0 +1,108 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Edge: открыть рабочий комбайн",
+      "type": "shell",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "start",
+        "msedge",
+        "${workspaceFolder}\\src\\mdx-combine.html"
+      ],
+      "problemMatcher": [],
+      "group": "none",
+      "presentation": {
+        "reveal": "never",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Edge: doctor (проверка без Node)",
+      "type": "shell",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "start",
+        "msedge",
+        "${workspaceFolder}\\doctor.html"
+      ],
+      "problemMatcher": [],
+      "group": "none",
+      "presentation": {
+        "reveal": "never",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Проверка: линтер комбайна",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "scripts/check.mjs"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": {
+        "owner": "mdx-combine",
+        "fileLocation": [
+          "relative",
+          "${workspaceFolder}"
+        ],
+        "pattern": {
+          "regexp": "^(.+?\\.html):(\\d+):(\\d+):\\s+(ERROR|WARN)\\s+\\[(.+?)\\]\\s+(.+)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "code": 5,
+          "message": 6
+        }
+      }
+    },
+    {
+      "label": "Доставка: .md в Astro-проект",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "scripts/promote.mjs"
+      ],
+      "group": "build",
+      "problemMatcher": {
+        "owner": "mdx-posts",
+        "fileLocation": "absolute",
+        "pattern": {
+          "regexp": "^(.+):(\\d+):(\\d+):\\s+(ERROR|WARN|OK)\\s+(.+)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        }
+      }
+    },
+    {
+      "label": "Архив: снять копию текущей версии",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "scripts/archive.mjs"
+      ],
+      "group": "none",
+      "problemMatcher": []
+    },
+    {
+      "label": "Комплекс: линтер → доставка",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Проверка: линтер комбайна",
+        "Доставка: .md в Astro-проект"
+      ],
+      "group": "none",
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "html.autoClosingTags": false,
+  "html.autoCreateQuotes": false,
+  "html.format.indentInnerHtml": true,
+  "html.format.wrapLineLength": 0,
+  "html.format.preserveNewLines": true,
+  "html.format.unformatted": "w",
+  "emmet.triggerExpansionOnTab": false,
+  "editor.formatOnSave": false,
+  "editor.tabSize": 2,
+  "editor.detectIndentation": false,
+  "editor.renderWhitespace": "boundary",
+  "search.exclude": {
+    "**/inbox": true,
+    "**/archive": true
+  },
+  "files.exclude": {
+    "**/.git": true,
+    "**/node_modules": true
+  },
+  "[html]": {
+    "editor.defaultFormatter": "vscode.html-language-features"
+  }
+}

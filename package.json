@@ -1,0 +1,16 @@
+{
+  "name": "mdx-combine",
+  "version": "1.0.0",
+  "description": "Генератор постов для Astro/Retypeset. Один HTML-файл, работает в Edge без Node.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "eslint": "^10.11.0"
+  }
+}
