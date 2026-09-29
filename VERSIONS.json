@@ -1,6 +1,6 @@
 {
   "current": {
-    "version": "1.1.2",
+    "version": "1.1.3",
     "takenAt": "2026-09-29"
   },
   "history": [
@@ -18,6 +18,11 @@
       "version": "1.1.2",
       "takenAt": "2026-09-29",
       "note": "published: ручная дата источника (input type=date, валидация YYYY-MM-DD, не в PERSIST); updated: автоматическая текущая дата генерации"
+    },
+    {
+      "version": "1.1.3",
+      "takenAt": "2026-09-29",
+      "note": "уникальность abbrlink: проверка по mdxc:used_abbrlinks перед генерацией, запись после успешной генерации; валидаторы (doctor/check/promote) приведены к финальным правилам"
     }
   ],
   "retired": [

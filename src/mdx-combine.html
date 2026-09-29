@@ -1,9 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru">
-<!DOCTYPE html>
-<html lang="ru">
 <head>
-  <!-- build: 1.1.2 -->
+  <!-- build: 1.1.3 -->
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>MDX-комбайн</title>
@@ -41,7 +39,7 @@
 <body>
 
 <div class="container">
-  <h1>MDX-комбайн</h1><span class="build-badge" id="buildStamp">build: 1.1.2</span>
+  <h1>MDX-комбайн</h1><span class="build-badge" id="buildStamp">build: 1.1.3</span>
   <p>Генератор постов для Astro/Retypeset: frontmatter по ТЗ + конвертация HTML в Markdown. Защита от пустых полей, память повторяющихся полей.</p>
 
   <div class="hint">
@@ -63,7 +61,7 @@
       <label for="abbrlink">Abbrlink (только ручной ввод)</label>
       <input type="text" id="abbrlink" placeholder="можно оставить пустым" />
       <small>Только строчные a-z, цифры и дефис. Пусто — ключ abbrlink: не выводится.</small>
-      <div class="error-msg" id="errAbbrlink">Нужен валидный slug: строчные a-z, 0-9, дефис; без заглавных и подчёркиваний</div>
+      <div class="error-msg" id="errAbbrlink">Нужен валидный и уникальный slug: строчные a-z, 0-9, дефис; без заглавных и подчёркиваний. Уже использованный abbrlink не принимается</div>
     </div>
 
     <!-- 3: Метаданные -->
@@ -147,6 +145,22 @@
 
   // Валидатор abbrlink: строчные, цифры, дефис
   const ABBRLINK_RE = /^[a-z0-9-]+$/;
+
+  // Уникальность abbrlink: массив использованных в localStorage (mdxc:used_abbrlinks).
+  // Защита от падения сборки Astro на дублях abbrlink.
+  const USED_KEY = 'mdxc:used_abbrlinks';
+
+  function getUsedAbbrlinks() {
+    try { return JSON.parse(localStorage.getItem(USED_KEY)) || []; } catch (e) { return []; }
+  }
+
+  function markAbbrlinkUsed(abbr) {
+    const used = getUsedAbbrlinks();
+    if (!used.includes(abbr)) {
+      used.push(abbr);
+      try { localStorage.setItem(USED_KEY, JSON.stringify(used)); } catch (e) {}
+    }
+  }
 
   // Валидатор published: ручной ввод даты источника, строго YYYY-MM-DD
   const PUBLISHED_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -332,6 +346,9 @@
     if (!title) throw new Error('Заголовок обязателен');
     if (!body) throw new Error('Контент обязателен');
     if (abbrRaw && !abbrValid) throw new Error('Abbrlink невалиден: только строчные a-z, 0-9, дефис');
+    // abbrlink опционален; если введён — должен быть уникальным (память использованных)
+    if (abbrValid && getUsedAbbrlinks().includes(abbrRaw))
+      throw new Error('Этот abbrlink уже использован, нужен уникальный');
 
     let converted = false;
     if (hasHtmlTags(body)) {
@@ -393,9 +410,15 @@
     filenameEl.value = title ? slugify(title) : '';
   }
 
+  function isAbbrOk(v) {
+    if (v.length === 0) return true;
+    if (!ABBRLINK_RE.test(v)) return false;
+    return !getUsedAbbrlinks().includes(v);
+  }
+
   function checkFormValidity() {
     const titleOk = titleEl.value.trim().length > 0;
-    const abbrOk = abbrEl.value.trim().length === 0 || ABBRLINK_RE.test(abbrEl.value.trim());
+    const abbrOk = isAbbrOk(abbrEl.value.trim());
     const publishedOk = PUBLISHED_RE.test(publishedEl.value.trim());
     const contentOk = contentEl.value.trim().length > 0;
     btnGen.disabled = !(titleOk && abbrOk && publishedOk && contentOk);
@@ -412,7 +435,7 @@
 
   function refreshAll() {
     validateField(titleEl, v => v.length > 0, 'errTitle');
-    validateField(abbrEl, v => v.length === 0 || ABBRLINK_RE.test(v), 'errAbbrlink');
+    validateField(abbrEl, v => isAbbrOk(v), 'errAbbrlink');
     validateField(publishedEl, v => PUBLISHED_RE.test(v), 'errPublished');
     validateField(contentEl, v => v.length > 0, 'errContent');
     updateFilenamePreview();
@@ -467,6 +490,9 @@
 
       btnDl.disabled = false;
       btnCopy.disabled = false;
+
+      // abbrlink успешно использован — заносим в память использованных (уникальность)
+      if (data.abbrValid) markAbbrlinkUsed(data.abbrRaw);
 
       // Скачивание: Blob -> ссылка в DOM -> click -> отложенный revoke
       btnDl.onclick = () => {
