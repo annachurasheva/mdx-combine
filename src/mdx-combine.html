@@ -284,32 +284,15 @@
       el.outerHTML = '`' + el.textContent.trim() + '`';
     });
 
-    // Картинки: чистим суффикс web-archive im_/ (строка вида /имя/им_/, имя может быть URL),
-    // относительные пути -> /assets/. alt — только внутри квадратных скобок, отдельной строкой не выводим.
+    // ===== Конвертер: блок img заменён на эталон (Шаг 2). Абсолютные URL НЕ изменяются никак. =====
     doc.querySelectorAll('img').forEach(img => {
-      let src = img.getAttribute('src') || '';
-      const alt = (img.getAttribute('alt') || '').replace(/[[\]]/g, '');
-      src = src.replace(/im_\//, '');
-      if (!(src.startsWith('http://') || src.startsWith('https://'))) {
-        src = '/assets/' + src.replace(/^\/+/, '');
-      }
-      img.outerHTML = '![' + alt + '](' + src + ')';
+      const src = img.getAttribute('src') || '';
+      const alt = (img.getAttribute('alt') || 'Изображение').replace(/[[\]]/g, '');
+      const finalSrc = /^https?:\/\//.test(src) ? src : '/assets/' + src.replace(/^\/+/, '');
+      img.outerHTML = '![' + alt + '](' + finalSrc + ')';
     });
-
-    // Ссылка вокруг картинки -> [![alt](src)](href); обычные ссылки -> [text](href)
-    doc.querySelectorAll('a').forEach(a => {
-      const href = a.getAttribute('href') || '';
-      const imgMd = a.innerHTML.match(/!\[[^\]]*\]\([^)]*\)/);
-      if (a.querySelector('img')) {
-        a.outerHTML = imgMd ? '[' + imgMd[0] + '](' + href + ')' : a.innerHTML;
-        return;
-      }
-      const text = a.textContent.trim() || href;
-      a.outerHTML = '[' + text + '](' + href + ')';
-    });
-
-    doc.querySelectorAll('br').forEach(el => { el.outerHTML = '  \n'; });
-    doc.querySelectorAll('hr').forEach(el => { el.outerHTML = '\n---\n'; });
+    // Удалены: .replace(/web\/[^/]+\/im_\//,'web/') и .replace(/im_\//,'') — любые операции с im_/ над абсолютными src.
+    // Обработчик <a> не тронут: href проходит как есть.
 
     // Лишние div от копипасты: содержимое оставляем, обёртку убираем
     let guard = 0;

@@ -1,39 +1,11 @@
 {
-  "current": {
-    "version": "1.1.3",
-    "takenAt": "2026-09-29"
-  },
+  "current": { "version": "1.1.4", "date": "2026-09-30" },
   "history": [
-    {
-      "version": "1.0.0",
-      "takenAt": "2026-09-28",
-      "note": "все 10 патчей, дата YYYY-MM-DD, toc 3 состояния, authorIds списком"
-    },
-    {
-      "version": "1.1.1",
-      "takenAt": "2026-09-29",
-      "note": "filename = только slug; abbrlink в памяти и без автозаполнения; paste HTML; обёртка ссылки над картинкой; самопроверка метки сборки"
-    },
-    {
-      "version": "1.1.2",
-      "takenAt": "2026-09-29",
-      "note": "published: ручная дата источника (input type=date, валидация YYYY-MM-DD, не в PERSIST); updated: автоматическая текущая дата генерации"
-    },
-    {
-      "version": "1.1.3",
-      "takenAt": "2026-09-29",
-      "note": "уникальность abbrlink: проверка по mdxc:used_abbrlinks перед генерацией, запись после успешной генерации; валидаторы (doctor/check/promote) приведены к финальным правилам"
-    }
-  ],
-  "retired": [
-    {
-      "version": "0.7",
-      "reason": "артефакты $ — подстановки не работали",
-      "file": "archive/mdx-combine7_html.txt"
-    },
-    {
-      "version": "0.4",
-      "reason": "published с T и Z — ронял сборку"
-    }
+    { "version": "1.1.4", "date": "2026-09-30", "note": "фикс: URL картинок Web Archive не трогаем, im_/ сохранён" },
+    { "version": "1.1.3", "date": "2026-09-30", "note": "уникальность abbrlink через mdxc:used_abbrlinks" },
+    { "version": "1.1.2", "date": "2026-09-29", "note": "published ручной, updated авто" },
+    { "version": "1.1.1", "date": "2026-09-29", "note": "имя файла = slug, paste/img-конвертер" },
+    { "version": "1.1.0", "date": "2026-09-29", "note": "метка сборки, doctor" },
+    { "version": "1.0.0", "date": "2026-09-28", "note": "первая версия" }
   ]
 }

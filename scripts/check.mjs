@@ -62,6 +62,9 @@ const CHECKS = [
       const listStyle = /\n\s*-\s*\$\{/.test(s) || /push\(\s*'?\s*-\s*'/.test(s)
       return hasKey && listStyle
     }],
+  ['ERROR', 'im-mutilation',
+    'комбайн не имеет права резать префикс im_/ — абсолютные URL Web Archive проходят как есть',
+    s => !/replace\([^)]*im_\//.test(s)],
 
   ['ERROR', 'slug-clean',
     'в slugify должна быть очистка от всего, кроме [^a-z0-9-]',
@@ -83,10 +86,6 @@ const CHECKS = [
       const before = s.slice(Math.max(0, m.index - 40), m.index)
       return /setTimeout\s*\(/.test(before) || /=>\s*$/.test(before.trimEnd())
     }],
-
-  ['WARN', 'im-clean',
-    'нет очистки im_/ в ссылках Web Archive — картинки отдадут 404',
-    s => /im_\//.test(s)],
 
   ['WARN', 'stale-buttons',
     'правки формы не гасят Download/Copy — можно скачать устаревший .md',
