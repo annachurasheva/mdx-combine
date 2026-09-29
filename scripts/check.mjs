@@ -4,54 +4,72 @@ import process from 'node:process'
 
 const SRC = 'src'
 
-const ok = (cond) => !!cond
-
-// Допустимые значения toc: false / true (включённый по умолчанию) и числовые пороги 128 / 256.
-const TOC_OK = /value="(false|true|128|256)"/
+// Единый набор правил для комбайна (build 1.1.2+):
+// R6 toc — ровно true/false; R3 published — ручной ввод; R4 updated — авто-дата;
+// R7 имя файла = только slug; R8 PERSIST с abbrlink без title/content/published;
+// R9 артефакт экранирования — только \$ перед $.
 
 const CHECKS = [
   ['ERROR', 'escape-artifacts',
     'артефакт \\$ — подстановки печатаются текстом, а не подставляются',
-    s => !/\\\$\{/.test(s) && !/\\\$\//.test(s) && !/\\\$/.test(s)],
+    s => !/\\\$\{/.test(s)],
 
   ['ERROR', 'date-format',
-    "published должен собираться как .split('T')[0], иначе в YAML попадает время и Z",
+    "split('T') без [0]: в YAML попадёт время и Z",
     s => !/\.split\('T'\)(?!\[0\])/.test(s)],
 
-  ['ERROR', 'toc-three-states',
-    'toc обязан давать три состояния: false / true (или 128) / 256',
+  ['ERROR', 'toc-boolean',
+    'в select toc значения должны быть ровно true и false; числовые пороги запрещены',
     s => {
-      const vals = new Set()
-      for (const m of s.matchAll(/<select id="toc">[\s\S]*?<\/select>/g)) {
-        for (const o of m[0].matchAll(/value="([^"]+)"/g)) vals.add(o[1])
-      }
-      // достаточно: false + одно включённое состояние (true/128) + числовое 256
-      return vals.has('false') && (vals.has('true') || vals.has('128')) && vals.has('256')
-        // либо схема false/true без числовых порогов — тоже валидна для Retypeset
-        || (vals.size >= 2 && [...vals].every(v => TOC_OK.test(`value="${v}"`)))
+      const m = /<select id="toc">([\s\S]*?)<\/select>/.exec(s)
+      if (!m) return false
+      const vals = [...m[1].matchAll(/value="([^"]+)"/g)].map(x => x[1])
+      return vals.length === 2 && vals.includes('true') && vals.includes('false')
+    }],
+
+  ['ERROR', 'dates',
+    'published — только ручной ввод (input type=date id=published), текущая дата — только в updated',
+    s => {
+      // обязательное поле ручной даты
+      if (!/<input[^>]+type="date"[^>]+id="published"|<input[^>]+id="published"[^>]+type="date"/.test(s)) return false
+      // автоподстановка текущей даты в published запрещена
+      if (/published:\s*'?\s*\+?\s*now\b|publishedEl\.value\s*=\s*now\b/.test(s)) return false
+      // пустая строка updated в шаблоне вывода запрещена
+      if (/['"`]updated:\s*''/.test(s)) return false
+      // updated обязан выводиться из текущей даты
+      if (!/['"]updated:\s*['"]\s*\+\s*(?:data\.)?(now|today)\b|\{\s*updated:\s*(now|today)\b/.test(s)) return false
+      return true
+    }],
+
+  ['ERROR', 'filename-slug-only',
+    'имя файла собирается только из slug; abbrlink в имени файла не участвует',
+    s => !/abbrRaw\s*\+\s*['"]-['"]/.test(s)],
+
+  ['ERROR', 'persist',
+    "PERSIST должен содержать 'abbrlink' и не содержать 'title'/'content'/'published'",
+    s => {
+      const m = /const PERSIST\s*=\s*\[([^\]]*)\]/.exec(s)
+      if (!m) return false
+      const list = m[1]
+      if (/'(title|content|published)'/.test(list)) return false
+      return /'abbrlink'/.test(list)
     }],
 
   ['ERROR', 'authorids-list',
     'authorIds должен выводиться YAML-списком (  - id), а не строкой',
     s => {
-      // required: ключ authorIds: присутствует ИЛИ в шаблоне frontmatter,
-      // ИЛИ в JS-генераторе есть push('  - ' + ...) для авторов
       const hasKey = /authorIds:/.test(s)
-      const listStyle = /\n\s*-\s*\$\{/.test(s) || /push\(\s*'?\s*-\s*'?/.test(s)
+      const listStyle = /\n\s*-\s*\$\{/.test(s) || /push\(\s*'?\s*-\s*'/.test(s)
       return hasKey && listStyle
     }],
 
-  ['ERROR', 'slug-no-underscore',
-    "slug должен чиститься до [^a-z0-9-], иначе '_' пройдёт и валидатор отвергнет",
-    s => !/\[\^\\w-?\+?\]?\/g/.test(s)],
+  ['ERROR', 'slug-clean',
+    'в slugify должна быть очистка от всего, кроме [^a-z0-9-]',
+    s => /\[\^a-z0-9-\]/.test(s)],
 
   ['WARN', 'description-forbidden',
     'в шаблоне frontmatter быть не должно ключа description — его даёт тема из toc',
     s => !/`description:/.test(s)],
-
-  ['WARN', 'persist',
-    'нет localStorage: последний ввод не запомнится для серии постов',
-    s => /localStorage/.test(s)],
 
   ['WARN', 'download-dom',
     'ссылку нужно вставить в DOM перед click() — иначе Edge/Firefox обрывают загрузку',
@@ -60,7 +78,6 @@ const CHECKS = [
   ['WARN', 'revoke-timing',
     'revokeObjectURL нельзя вызывать сразу после click() — файл не успеет стартануть',
     s => {
-      // плохо, если URL.revokeObjectURL(...) вызывается синхронно (не внутри setTimeout)
       const m = /URL\.revokeObjectURL/.exec(s)
       if (!m) return true
       const before = s.slice(Math.max(0, m.index - 40), m.index)
@@ -74,7 +91,6 @@ const CHECKS = [
   ['WARN', 'stale-buttons',
     'правки формы не гасят Download/Copy — можно скачать устаревший .md',
     s => /disabled\s*=\s*true/.test(s)
-      // кнопок скачивания/копирования нет вовсе — проверять нечего
       || !(/btnDl|downloadBtn/.test(s))],
 
   ['WARN', 'build-stamp',
@@ -89,11 +105,12 @@ function idProblems(src) {
     declared.set(m[1], (declared.get(m[1]) || 0) + 1)
   }
   for (const [id, n] of declared) {
-    if (n > 1) out.push([1, 1, 'ERROR', 'dup-id', `id="${id}" встречается ${n} раз`])
+    if (n > 1) out.push([lineOf(src, `id="${id}"`), 1, 'ERROR', 'dup-id', `id="${id}" встречается ${n} раз`])
   }
   for (const m of src.matchAll(/getElementById\(\s*['"]([^'"]+)['"]\s*\)/g)) {
     if (!declared.has(m[1])) {
-      out.push([1, 1, 'ERROR', 'missing-id', `нет элемента id="${m[1]}" — getElementById вернёт null`])
+      out.push([lineOf(src, `getElementById('${m[1]}')`), 1, 'ERROR', 'missing-id',
+        `нет элемента id="${m[1]}" — getElementById вернёт null`])
     }
   }
   return out

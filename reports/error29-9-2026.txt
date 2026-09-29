@@ -1,0 +1,115 @@
+Preparing pnpm@10.33.0 for immediate activation...
+10.33.0
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +896
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 896, reused 0, downloaded 158, added 157
+Progress: resolved 896, reused 0, downloaded 322, added 322
+Progress: resolved 896, reused 0, downloaded 473, added 472
+Progress: resolved 896, reused 0, downloaded 608, added 593
+Progress: resolved 896, reused 0, downloaded 649, added 637
+Progress: resolved 896, reused 0, downloaded 821, added 821
+Progress: resolved 896, reused 0, downloaded 896, added 896, done
+.../sharp@0.34.5/node_modules/sharp install$ node install/check.js || npm run build
+.../esbuild@0.27.7/node_modules/esbuild postinstall$ node install.js
+.../node_modules/simple-git-hooks postinstall$ node ./postinstall.js
+.../esbuild@0.27.7/node_modules/esbuild postinstall: Done
+.../sharp@0.34.5/node_modules/sharp install: Done
+.../node_modules/simple-git-hooks postinstall: [INFO] Successfully set the pre-commit with command: pnpm lint-staged
+.../node_modules/simple-git-hooks postinstall: Done
+
+dependencies:
++ @astrojs/mdx 5.0.3
++ @astrojs/partytown 2.1.6
++ @astrojs/sitemap 3.7.2
++ @waline/client 3.13.0
++ astro 6.1.5
++ astro-compress 2.4.1
++ astro-og-canvas 0.11.0
++ canvaskit-wasm 0.41.1
++ feed 5.2.0
++ katex 0.16.45
++ lite-youtube-embed 0.3.4
++ markdown-it 14.1.1
++ mdast-util-to-string 4.0.0
++ mermaid 11.14.0
++ node-html-parser 7.1.0
++ reading-time 1.5.0
++ rehype-katex 7.0.1
++ rehype-mermaid 3.0.0
++ rehype-slug 6.0.0
++ remark-directive 4.0.0
++ remark-math 6.0.0
++ sanitize-html 2.17.2
++ sharp 0.34.5
++ twikoo 1.7.7
++ unist-util-visit 5.1.0
+
+devDependencies:
++ @antfu/eslint-config 8.1.1
++ @astrojs/check 0.9.8
++ @types/markdown-it 14.1.2
++ @types/node 25.6.0
++ @types/sanitize-html 2.16.1
++ @unocss/astro 66.6.8
++ @unocss/eslint-plugin 66.6.8
++ @unocss/preset-attributify 66.6.8
++ @unocss/reset 66.6.8
++ astro-eslint-parser 1.4.0
++ autocorrect-node 2.14.0
++ eslint 10.2.0
++ eslint-plugin-astro 1.7.0
++ fast-glob 3.3.3
++ lint-staged 16.4.0
++ playwright 1.59.1
++ simple-git-hooks 2.13.1
++ tsx 4.21.0
++ typescript 6.0.2
++ unocss 66.6.8
++ unocss-preset-theme 0.14.1
+
+Done in 7.9s using pnpm v10.33.0
+
+> memorial-korpech-crimea@1.0.0 build /sourcecraft/workspace
+> astro check && astro build && pnpm apply-lqip
+
+[2m15:04:55[22m [34m[content][39m Syncing content
+[2m15:04:55[22m [34m[content][39m Synced content
+[2m15:04:55[22m [34m[types][39m Generated [2m1.31s[22m
+[2m15:04:55[22m [34m[check][39m Getting diagnostics for Astro files in /sourcecraft/workspace...
+Result (63 files): 
+- 0 errors
+- 0 warnings
+- 0 hints
+
+[2m15:05:04[22m [34m[content][39m Syncing content
+[2m15:05:04[22m [34m[content][39m Synced content
+[2m15:05:04[22m [34m[types][39m Generated [2m775ms[22m
+[2m15:05:04[22m [34m[build][39m output: [34m"static"[39m
+[2m15:05:04[22m [34m[build][39m mode: [34m"static"[39m
+[2m15:05:04[22m [34m[build][39m directory: [34m/sourcecraft/workspace/dist/[39m
+[2m15:05:04[22m [34m[build][39m Collecting build info...
+[2m15:05:04[22m [34m[build][39m [32m✓ Completed in 1.09s.[39m
+[2m15:05:04[22m [34m[build][39m Building static entrypoints...
+[2m15:05:07[22m [34m[vite][39m [32m✓ built in 3.00s[39m
+[2m15:05:16[22m [34m[vite][39m [32m✓ built in 8.57s[39m
+[2m15:05:16[22m [34m[build][39m Rearranging server assets...
+
+[42m[30m generating static routes [39m[49m
+Duplicate post slugs:
+Duplicate slug "memento-sevastopol-ru-necropol" found in "ru" language post
+Duplicate slug "memento-sevastopol-ru-necropol" found in "ru" language post
+Duplicate slug "memento-sevastopol-ru-necropol" found in "ru" language post
+  [1mLocation:[22m
+    [4m/sourcecraft/workspace/node_modules/.pnpm/astro@6.1.5_@types+node@25.6.0_jiti@2.6.1_lightningcss@1.32.0_rollup@4.60.1_terser@5.46_6d0c47d141c1ea47b78a1edce0d9f0d9/node_modules/astro/dist/core/render/route-cache.js:29:17[24m
+  [1mStack trace:[22m
+[2m    at Module.getStaticPaths (file:///sourcecraft/workspace/dist/.prerender/chunks/_slug__9pZdccTU.mjs:233:11)
+    at async #getPathsForRoute (file:///sourcecraft/workspace/node_modules/.pnpm/astro@6.1.5_@types+node@25.6.0_jiti@2.6.1_lightningcss@1.32.0_rollup@4.60.1_terser@5.46_6d0c47d141c1ea47b78a1edce0d9f0d9/node_modules/astro/dist/runtime/prerender/static-paths.js:54:25)
+    at async generatePages (file:///sourcecraft/workspace/node_modules/.pnpm/astro@6.1.5_@types+node@25.6.0_jiti@2.6.1_lightningcss@1.32.0_rollup@4.60.1_terser@5.46_6d0c47d141c1ea47b78a1edce0d9f0d9/node_modules/astro/dist/core/build/generate.js:68:29)
+    at async Object.buildApp (file:///sourcecraft/workspace/node_modules/.pnpm/vite@7.3.2_@types+node@25.6.0_jiti@2.6.1_lightningcss@1.32.0_terser@5.46.1_tsx@4.21.0_yaml@2.8.3/node_modules/vite/dist/node/chunks/config.js:33898:5)
+    at async viteBuild (file:///sourcecraft/workspace/node_modules/.pnpm/astro@6.1.5_@types+node@25.6.0_jiti@2.6.1_lightningcss@1.32.0_rollup@4.60.1_terser@5.46_6d0c47d141c1ea47b78a1edce0d9f0d9/node_modules/astro/dist/core/build/static-build.js:76:3)
+    at async AstroBuilder.run (file:///sourcecraft/workspace/node_modules/.pnpm/astro@6.1.5_@types+node@25.6.0_jiti@2.6.1_lightningcss@1.32.0_rollup@4.60.1_terser@5.46_6d0c47d141c1ea47b78a1edce0d9f0d9/node_modules/astro/dist/core/build/index.js:189:7)
+    at async build (file:///sourcecraft/workspace/node_modules/.pnpm/astro@6.1.5_@types+node@25.6.0_jiti@2.6.1_lightningcss@1.32.0_rollup@4.60.1_terser@5.46_6d0c47d141c1ea47b78a1edce0d9f0d9/node_modules/astro/dist/cli/build/index.js:29:3)
+    at async cli (file:///sourcecraft/workspace/node_modules/.pnpm/astro@6.1.5_@types+node@25.6.0_jiti@2.6.1_lightningcss@1.32.0_rollup@4.60.1_terser@5.46_6d0c47d141c1ea47b78a1edce0d9f0d9/node_modules/astro/dist/cli/index.js:234:5)[22m
+ ELIFECYCLE  Command failed with exit code 1.

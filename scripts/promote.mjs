@@ -1,12 +1,13 @@
 import { readFile, writeFile, readdir, access, rm } from 'node:fs/promises'
-import { join, basename } from 'node:path'
+import { join } from 'node:path'
 import process from 'node:process'
 
 const INBOX = 'inbox'
 const TARGET = 'C:/astro-projects/astro-theme-retypeset/src/content/posts'   // ← поправь один раз
 
-const REQUIRED = ['title', 'published', 'abbrlink']
+const REQUIRED = ['title', 'published', 'updated']
 const FORBIDDEN = ['description']
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 async function exists(p) {
   try { await access(p); return true } catch { return false }
@@ -40,15 +41,24 @@ function verify(name, content) {
   }
 
   const pub = val('published')
-  if (pub && !/^\d{4}-\d{2}-\d{2}$/.test(pub))
+  if (pub && !DATE_RE.test(pub))
     out.push([abs, lineOf('published') + 1, 1, 'ERROR', `published должен быть YYYY-MM-DD, сейчас '${pub}'`])
 
+  // updated — автоматическая текущая дата: обязателен, формат даты, пустая строка — ошибка
+  const upd = val('updated')
+  const iUpd = lineOf('updated')
+  if (iUpd < 0) {
+    out.push([abs, 1, 1, 'ERROR', "нет обязательного поля 'updated'"])
+  } else if (!upd || upd === "''") {
+    out.push([abs, iUpd + 1, 1, 'ERROR', `поле 'updated' пустое — ожидается YYYY-MM-DD`])
+  } else if (!DATE_RE.test(upd)) {
+    out.push([abs, iUpd + 1, 1, 'ERROR', `updated должен быть YYYY-MM-DD, сейчас '${upd}'`])
+  }
+
+  // abbrlink опционален; если присутствует и непуст — только [a-z0-9-]
   const abbr = val('abbrlink').replace(/^['"]|['"]$/g, '')
   if (abbr && !/^[a-z0-9-]+$/.test(abbr))
     out.push([abs, lineOf('abbrlink') + 1, 1, 'ERROR', `abbrlink невалиден: '${abbr}'`])
-
-  if (basename(name, '.md') !== abbr)
-    out.push([abs, 1, 1, 'WARN', `имя файла '${basename(name)}' ≠ abbrlink '${abbr}'`])
 
   if (body.trim().length < 200)
     out.push([abs, 1, 1, 'WARN', 'подозрительно короткое тело'])

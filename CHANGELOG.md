@@ -1,5 +1,11 @@
 # Changelog
 
+## [validators] - 2026-09-29
+- doctor.html, check.mjs, promote.mjs приведены к финальным правилам: toc булево (ровно true/false), published ручной (input type=date, id=published), updated авто-дата (YYYY-MM-DD, пустая строка — ошибка), abbrlink опционален (если есть — `^[a-z0-9-]+$`), имя файла = slug (сверка имени с abbrlink удалена).
+- escape-artifacts: банится только артефакт `\$` перед `$`; легальные якоря `$` в регулярках больше не флагуются.
+- check.mjs / doctor.html: добавлены проверки dates, filename-slug-only, persist (ERROR: PERSIST содержит 'abbrlink', без 'title'/'content'/'published'), slug-clean; исправлена рабочая регулярка missing-id (`getElementById('…')`/`("…")` против объявленных `id="…"`); удалены «три состояния» toc и константы 128/256.
+- promote.mjs: REQUIRED = title, published, updated; проверка updated по формату даты; поведение «ERROR → файл остаётся в inbox/» без изменений.
+
 ## [1.1.2] - 2026-09-29
 - published: ручная дата источника — убрана автоподстановка текущей даты; добавлено поле `<input type="date" id="published">` в карточке метаданных с label «Дата публикации (из источника) *» и подписью «Дата оригинального поста на архивном источнике — вручную». По умолчанию пусто. Валидация `^\d{4}-\d{2}-\d{2}$`: пока пусто или невалидно — «Создать .md» неактивна, красная рамка и текст ошибки под полем. В PERSIST не добавлялось.
 - updated: автоматическая текущая дата — при генерации `const now = new Date().toISOString().split('T')[0]`, в файл уходит строка `updated: YYYY-MM-DD`; строка `"updated: ''"` из шаблона удалена.

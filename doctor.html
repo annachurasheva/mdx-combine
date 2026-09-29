@@ -18,25 +18,48 @@
 </head>
 <body>
 <h1>Doctor</h1>
-<p>Перетащи сюда <code>mdx-combine.html</code> (можно несколько файлов). Проверяется то, что реально ломало сборку: экранирование, формат даты, <code>toc</code>, <code>authorIds</code>, битые ссылки на <code>id</code>, незакрытые шаблонные литералы.</p>
+<p>Перетащи сюда <code>mdx-combine.html</code> (можно несколько файлов). Проверяется то, что реально ломало сборку: экранирование (<code>\$</code>), даты (published — ручная, updated — авто), <code>toc</code>, <code>authorIds</code>, битые ссылки на <code>id</code>, незакрытые шаблонные литералы.</p>
 <div class="drop" id="drop">Перетащи файлы сюда или нажми и выбери</div>
 <input type="file" id="pick" multiple accept=".html,.htm,.txt" hidden>
 <div id="out"></div>
 
 <script>
 const CHECKS = [
-  ['ERROR', 'escape-artifacts', '\\$ — подстановки печатаются текстом',
-   s => !/\\\$/.test(s)],
-  ['ERROR', 'date-format', "published без [0]: попадёт время и Z",
+  ['ERROR', 'escape-artifacts', '\\$ перед $ — артефакт экранирования, подстановки печатаются текстом',
+   s => !/\\\$\{/.test(s)],
+  ['ERROR', 'date-format', "split('T') без [0]: в YAML попадёт время и Z",
    s => !/\.split\('T'\)(?!\[0\])/.test(s)],
-  ['ERROR', 'toc-three-states', 'toc не даёт состояния false/true (или 128/256)',
-   s => { const v = new Set(); for (const m of s.matchAll(/value="([^"]+)"/g)) v.add(m[1]); return v.has('false') && (v.has('true') || v.has('128')) },],
+  ['ERROR', 'toc-boolean', 'в select toc значения должны быть ровно true и false (без числовых порогов)',
+   s => {
+    const m = /<select id="toc">([\s\S]*?)<\/select>/.exec(s)
+    if (!m) return false
+    const vals = [...m[1].matchAll(/value="([^"]+)"/g)].map(x => x[1])
+    return vals.length === 2 && vals.includes('true') && vals.includes('false')
+   }],
+  ['ERROR', 'dates', 'published — только ручной ввод (type=date, id=published); текущая дата уходит в updated',
+   s => {
+    if (!/<input[^>]+type="date"[^>]+id="published"|<input[^>]+id="published"[^>]+type="date"/.test(s)) return false
+    if (/published:\s*'?\s*\+?\s*now\b|publishedEl\.value\s*=\s*now\b/.test(s)) return false
+    if (/['"`]updated:\s*''/.test(s)) return false
+    if (!/['"]updated:\s*['"]\s*\+\s*(?:data\.)?(now|today)\b|\{\s*updated:\s*(now|today)\b/.test(s)) return false
+    return true
+   }],
+  ['ERROR', 'filename-slug-only', 'имя файла должно собираться только из slug; abbrlink в имени не участвует',
+   s => !/abbrRaw\s*\+\s*['"]-['"]/.test(s)],
+  ['ERROR', 'persist', "PERSIST должен содержать 'abbrlink' и не содержать 'title'/'content'/'published'",
+   s => {
+    const m = /const PERSIST\s*=\s*\[([^\]]*)\]/.exec(s)
+    if (!m) return false
+    const list = m[1]
+    if (/'(title|content|published)'/.test(list)) return false
+    return /'abbrlink'/.test(list)
+   }],
   ['ERROR', 'authorids-list', 'authorIds строкой вместо YAML-списка',
-   s => /authorIds:/.test(s) && (/\n\s*-\s*\$\{/.test(s) || /push\(\s*'?'\s*-\s*/.test(s))],
+   s => /authorIds:/.test(s) && (/\n\s*-\s*\$\{/.test(s) || /push\(\s*'?'?\s*-\s*'?/.test(s))],
+  ['ERROR', 'slug-clean', 'в slugify должна быть очистка [^a-z0-9-]',
+   s => /\[\^a-z0-9-\]/.test(s)],
   ['WARN', 'description-forbidden', 'есть ключ description',
    s => !/`description:/.test(s)],
-  ['WARN', 'persist', 'нет localStorage',
-   s => /localStorage/.test(s)],
   ['WARN', 'download-dom', 'ссылка не вставляется в DOM перед click()',
    s => /body\.appendChild\(a\)/.test(s)],
   ['WARN', 'revoke-timing', 'revokeObjectURL сразу после click()',
