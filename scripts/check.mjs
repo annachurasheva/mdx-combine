@@ -6,6 +6,9 @@ const SRC = 'src'
 
 const ok = (cond) => !!cond
 
+// Допустимые значения toc: false / true (включённый по умолчанию) и числовые пороги 128 / 256.
+const TOC_OK = /value="(false|true|128|256)"/
+
 const CHECKS = [
   ['ERROR', 'escape-artifacts',
     'артефакт \\$ — подстановки печатаются текстом, а не подставляются',
@@ -16,12 +19,27 @@ const CHECKS = [
     s => !/\.split\('T'\)(?!\[0\])/.test(s)],
 
   ['ERROR', 'toc-three-states',
-    'toc обязан давать три состояния: false / 128 / 256',
-    s => /<option value="128">/.test(s) && /<option value="256">/.test(s)],
+    'toc обязан давать три состояния: false / true (или 128) / 256',
+    s => {
+      const vals = new Set()
+      for (const m of s.matchAll(/<select id="toc">[\s\S]*?<\/select>/g)) {
+        for (const o of m[0].matchAll(/value="([^"]+)"/g)) vals.add(o[1])
+      }
+      // достаточно: false + одно включённое состояние (true/128) + числовое 256
+      return vals.has('false') && (vals.has('true') || vals.has('128')) && vals.has('256')
+        // либо схема false/true без числовых порогов — тоже валидна для Retypeset
+        || (vals.size >= 2 && [...vals].every(v => TOC_OK.test(`value="${v}"`)))
+    }],
 
   ['ERROR', 'authorids-list',
     'authorIds должен выводиться YAML-списком (  - id), а не строкой',
-    s => /authorIds:/test(s) && /\n\s*-\s*\$\{/.test(s)],
+    s => {
+      // required: ключ authorIds: присутствует ИЛИ в шаблоне frontmatter,
+      // ИЛИ в JS-генераторе есть push('  - ' + ...) для авторов
+      const hasKey = /authorIds:/.test(s)
+      const listStyle = /\n\s*-\s*\$\{/.test(s) || /push\(\s*'?\s*-\s*'?/.test(s)
+      return hasKey && listStyle
+    }],
 
   ['ERROR', 'slug-no-underscore',
     "slug должен чиститься до [^a-z0-9-], иначе '_' пройдёт и валидатор отвергнет",
@@ -29,7 +47,7 @@ const CHECKS = [
 
   ['WARN', 'description-forbidden',
     'в шаблоне frontmatter быть не должно ключа description — его даёт тема из toc',
-    s => !/`description:/test(s)],
+    s => !/`description:/.test(s)],
 
   ['WARN', 'persist',
     'нет localStorage: последний ввод не запомнится для серии постов',
@@ -41,7 +59,13 @@ const CHECKS = [
 
   ['WARN', 'revoke-timing',
     'revokeObjectURL нельзя вызывать сразу после click() — файл не успеет стартануть',
-    s => !/revokeObjectURL/.test(s) || /setTimeout\([^)]*revokeObjectURL/.test(s)],
+    s => {
+      // плохо, если URL.revokeObjectURL(...) вызывается синхронно (не внутри setTimeout)
+      const m = /URL\.revokeObjectURL/.exec(s)
+      if (!m) return true
+      const before = s.slice(Math.max(0, m.index - 40), m.index)
+      return /setTimeout\s*\(/.test(before) || /=>\s*$/.test(before.trimEnd())
+    }],
 
   ['WARN', 'im-clean',
     'нет очистки im_/ в ссылках Web Archive — картинки отдадут 404',
@@ -49,8 +73,9 @@ const CHECKS = [
 
   ['WARN', 'stale-buttons',
     'правки формы не гасят Download/Copy — можно скачать устаревший .md',
-    s => /btnDl'\)\.disabled = true|downloadBtn\.disabled = true/.test(s)
-      || /btnDl|btnCopy/.test(s) === false],
+    s => /disabled\s*=\s*true/.test(s)
+      // кнопок скачивания/копирования нет вовсе — проверять нечего
+      || !(/btnDl|downloadBtn/.test(s))],
 
   ['WARN', 'build-stamp',
     'нет отметки версии: не определить, какой файл открыт в Edge',

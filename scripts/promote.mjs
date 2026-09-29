@@ -59,7 +59,14 @@ function verify(name, content) {
   return out
 }
 
-if (!(await exists(INBOX))) {
+if (!(await exists(TARGET))) {
+  console.log(`ERROR: целевая папка не найдена: ${TARGET}`)
+  console.log('Поправь константу TARGET в scripts/promote.mjs на путь к posts/ твоего Astro-проекта.')
+  process.exit(1)
+}
+
+const inboxFiles = (await readdir(INBOX)).filter(f => /\.mdx?$/i.test(f))
+if (!(await exists(INBOX)) || inboxFiles.length === 0) {
   console.log(`${INBOX}/ пустой — нечего доставлять`)
   process.exit(0)
 }
