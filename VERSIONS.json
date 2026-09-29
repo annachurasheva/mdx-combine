@@ -1,13 +1,18 @@
 {
   "current": {
-    "version": "1.0.0",
-    "takenAt": "2026-09-28"
+    "version": "1.1.1",
+    "takenAt": "2026-09-29"
   },
   "history": [
     {
       "version": "1.0.0",
       "takenAt": "2026-09-28",
       "note": "все 10 патчей, дата YYYY-MM-DD, toc 3 состояния, authorIds списком"
+    },
+    {
+      "version": "1.1.1",
+      "takenAt": "2026-09-29",
+      "note": "filename = только slug; abbrlink в памяти и без автозаполнения; paste HTML; обёртка ссылки над картинкой; самопроверка метки сборки"
     }
   ],
   "retired": [

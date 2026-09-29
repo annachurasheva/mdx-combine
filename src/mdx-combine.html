@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <!-- build: 1.1.0 -->
+  <!-- build: 1.1.1 -->
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>MDX-комбайн</title>
@@ -39,13 +39,13 @@
 <body>
 
 <div class="container">
-  <h1>MDX-комбайн</h1><span class="build-badge">build: 1.1.0</span>
+  <h1>MDX-комбайн</h1><span class="build-badge" id="buildStamp">build: 1.1.1</span>
   <p>Генератор постов для Astro/Retypeset: frontmatter по ТЗ + конвертация HTML в Markdown. Защита от пустых полей, память повторяющихся полей.</p>
 
   <div class="hint">
     <strong>description намеренно отсутствует</strong> — его формирует тема из <code>toc</code>.<br />
     <code>published</code> пишется как <code>YYYY-MM-DD</code> (без времени и Z — иначе сборка падает).<br />
-    <code>abbrlink</code> оставите пустым — ключ <code>abbrlink:</code> в файл не попадёт, имя файла соберётся из slug.
+    <code>abbrlink</code> оставите пустым — ключ <code>abbrlink:</code> в файл не попадёт; имя файла всегда = slug заголовка.
   </div>
 
   <div class="grid">
@@ -58,7 +58,7 @@
 
     <!-- 2: Abbrlink (отдельная карточка от title, своя валидация, свой текст ошибки) -->
     <div class="card">
-      <label for="abbrlink">Abbrlink (авто из title)</label>
+      <label for="abbrlink">Abbrlink (только ручной ввод)</label>
       <input type="text" id="abbrlink" placeholder="можно оставить пустым" />
       <small>Только строчные a-z, цифры и дефис. Пусто — ключ abbrlink: не выводится.</small>
       <div class="error-msg" id="errAbbrlink">Нужен валидный slug: строчные a-z, 0-9, дефис; без заглавных и подчёркиваний</div>
@@ -99,7 +99,7 @@
   <div class="card" style="margin-top:1.5rem">
     <label for="filename">Имя файла (без расширения)</label>
     <input type="text" id="filename" placeholder="заполняется автоматически" readonly />
-    <small>abbrlink + slug через дефис; при пустом abbrlink — только slug; дубль «slug-slug» не собирается.</small>
+    <small>Имя файла всегда = slug заголовка: &lt;slug&gt;.md. abbrlink в имени файла не участвует</small>
   </div>
 
   <div class="actions">
@@ -183,14 +183,12 @@
   const btnDl = document.getElementById('btnDl');
   const btnCopy = document.getElementById('btnCopy');
 
-  // dirty-флаг: ручная правка abbrlink отключает автозаполнение транслитом
-  let abbrDirty = false;
-  abbrEl.addEventListener('input', () => { abbrDirty = true; });
+  const btnReset = document.getElementById('btnReset');
 
   // ============ 3. ПАМЯТЬ ПОСЛЕДНЕГО ЗАПОЛНЕНИЯ ============
   // localStorage с префиксом mdxc: только повторяющиеся поля.
-  // title, abbrlink, контент и имя файла НЕ сохраняются.
-  const PERSIST = ['authors', 'tags', 'pin', 'draft', 'toc', 'lang'];
+  // title, контент и имя файла НЕ сохраняются; abbrlink запоминается (ручной ввод).
+  const PERSIST = ['authors', 'tags', 'pin', 'draft', 'toc', 'lang', 'abbrlink'];
 
   function saveField(id) {
     try { localStorage.setItem('mdxc:' + id, document.getElementById(id).value); } catch (e) {}
@@ -206,7 +204,7 @@
     });
   }
 
-  document.getElementById('btnReset').addEventListener('click', () => {
+  btnReset.addEventListener('click', () => {
     PERSIST.forEach(id => { try { localStorage.removeItem('mdxc:' + id); } catch (e) {} });
     authorsEl.value = '';
     tagsEl.value = '';
@@ -214,6 +212,7 @@
     draftEl.value = 'false';
     tocEl.value = 'true';
     langEl.value = 'ru';
+    abbrEl.value = '';
     setStatus('success', 'Память сброшена — поля по умолчанию.');
   });
 
@@ -262,10 +261,10 @@
     });
 
     // Картинки: чистим суффикс web-archive im_/ (строка вида /имя/им_/, имя может быть URL),
-    // относительные пути -> /assets/
+    // относительные пути -> /assets/. alt — только внутри квадратных скобок, отдельной строкой не выводим.
     doc.querySelectorAll('img').forEach(img => {
       let src = img.getAttribute('src') || '';
-      const alt = (img.getAttribute('alt') || 'Изображение').replace(/[[\]]/g, '');
+      const alt = (img.getAttribute('alt') || '').replace(/[[\]]/g, '');
       src = src.replace(/im_\//, '');
       if (!(src.startsWith('http://') || src.startsWith('https://'))) {
         src = '/assets/' + src.replace(/^\/+/, '');
@@ -273,9 +272,14 @@
       img.outerHTML = '![' + alt + '](' + src + ')';
     });
 
+    // Ссылка вокруг картинки -> [![alt](src)](href); обычные ссылки -> [text](href)
     doc.querySelectorAll('a').forEach(a => {
       const href = a.getAttribute('href') || '';
-      if (a.querySelector('img')) { a.outerHTML = a.innerHTML; return; }
+      const imgMd = a.innerHTML.match(/!\[[^\]]*\]\([^)]*\)/);
+      if (a.querySelector('img')) {
+        a.outerHTML = imgMd ? '[' + imgMd[0] + '](' + href + ')' : a.innerHTML;
+        return;
+      }
       const text = a.textContent.trim() || href;
       a.outerHTML = '[' + text + '](' + href + ')';
     });
@@ -330,14 +334,8 @@
     // published: YYYY-MM-DD, без T, времени, Z и запятой
     const now = new Date().toISOString().split('T')[0];
 
-    // Имя файла: abbrlink-<slug>, разделитель — дефис; при пустом abbrlink — <slug>;
-    // если abbrlink побуквенно равен slug (автозаполнение, правки не было), дубль не собираем.
-    let filename;
-    if (abbrValid && abbrRaw !== slug) {
-      filename = abbrRaw + '-' + slug;
-    } else {
-      filename = slug;
-    }
+    // Имя файла: всегда только slug заголовка. abbrlink в имени файла не участвует.
+    const filename = slug;
 
     return { title, abbrRaw, abbrValid, slug, authors, tags, draft, pin, toc, lang, body, now, converted, filename };
   }
@@ -377,14 +375,8 @@
   // ============ 7. ВАЛИДАЦИЯ И КНОПКИ ============
   function updateFilenamePreview() {
     const title = titleEl.value.trim();
-    const abbrRaw = abbrEl.value.trim();
-    const abbrValid = ABBRLINK_RE.test(abbrRaw);
-    const slug = title ? slugify(title) : '';
-    if (abbrValid && slug && abbrRaw !== slug) {
-      filenameEl.value = abbrRaw + '-' + slug;
-    } else {
-      filenameEl.value = slug;
-    }
+    // Имя файла всегда = slug заголовка; abbrlink в имени файла не участвует.
+    filenameEl.value = title ? slugify(title) : '';
   }
 
   function checkFormValidity() {
@@ -423,13 +415,17 @@
     el.addEventListener('change', invalidateResult);
   });
 
-  // Автозаполнение abbrlink транслитом из title — только до первой ручной правки.
-  // Ручной ввод не перетираем.
-  titleEl.addEventListener('input', () => {
-    const t = titleEl.value.trim();
-    if (!abbrDirty) {
-      abbrEl.value = t ? slugify(t) : '';
-    }
+  // Вставка из буфера: если в clipboard есть HTML — вставляем его в позицию курсора
+  // и поднимаем 'input', чтобы превью имени, валидация и кнопки обновились.
+  contentEl.addEventListener('paste', (e) => {
+    const html = e.clipboardData ? e.clipboardData.getData('text/html') : '';
+    if (!html) return;
+    e.preventDefault();
+    const start = contentEl.selectionStart;
+    const end = contentEl.selectionEnd;
+    contentEl.value = contentEl.value.slice(0, start) + html + contentEl.value.slice(end);
+    contentEl.selectionStart = contentEl.selectionEnd = start + html.length;
+    contentEl.dispatchEvent(new Event('input'));
   });
 
   // ============ 8. ДЕЙСТВИЯ ============
@@ -491,6 +487,26 @@
   // ============ 9. ИНИЦИАЛИЗАЦИЯ ============
   restoreFields();
   refreshAll();
+
+  // ============ 10. САМОПРОВЕРКА МЕТКИ СБОРКИ ============
+  // Экранное значение бейджа сверяется с комментарием <!-- build: X.Y.Z --> в <head>.
+  // Читаем textContent ДО любого сравнения; при расхождении — красим бейдж и console.warn.
+  (() => {
+    const el = document.getElementById('buildStamp');
+    if (!el) return;
+    const shown = el.textContent.replace(/build:\s*/, '').trim();
+    let built = '';
+    for (const node of document.head.childNodes) {
+      if (node.nodeType === 8) {
+        const m = node.textContent.match(/build:\s*([\d.]+)/);
+        if (m) { built = m[1]; break; }
+      }
+    }
+    if (built && shown !== built) {
+      el.parentElement.style.color = '#c0392b';
+      console.warn('build stamp mismatch: shown="' + shown + '" head="' + built + '"');
+    }
+  })();
 </script>
 </body>
 </html>
