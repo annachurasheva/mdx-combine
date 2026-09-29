@@ -1,7 +1,10 @@
+--- src/mdx-combine.html (原始)
+<!DOCTYPE html>
+<html lang="ru">
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <!-- build: 1.1.1 -->
+  <!-- build: 1.1.2 -->
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>MDX-комбайн</title>
@@ -39,7 +42,7 @@
 <body>
 
 <div class="container">
-  <h1>MDX-комбайн</h1><span class="build-badge" id="buildStamp">build: 1.1.1</span>
+  <h1>MDX-комбайн</h1><span class="build-badge" id="buildStamp">build: 1.1.2</span>
   <p>Генератор постов для Astro/Retypeset: frontmatter по ТЗ + конвертация HTML в Markdown. Защита от пустых полей, память повторяющихся полей.</p>
 
   <div class="hint">
@@ -66,6 +69,10 @@
 
     <!-- 3: Метаданные -->
     <div class="card">
+      <label for="published">Дата публикации (из источника) *</label>
+      <input type="date" id="published" />
+      <small>Дата оригинального поста на архивном источнике — вручную</small>
+      <div class="error-msg" id="errPublished">Нужна дата в формате YYYY-MM-DD</div>
       <label for="authors">Авторы (через запятую)</label>
       <input type="text" id="authors" placeholder="nevzorov-b-i" />
       <label for="tags">Теги (через запятую)</label>
@@ -142,6 +149,9 @@
   // Валидатор abbrlink: строчные, цифры, дефис
   const ABBRLINK_RE = /^[a-z0-9-]+$/;
 
+  // Валидатор published: ручной ввод даты источника, строго YYYY-MM-DD
+  const PUBLISHED_RE = /^\d{4}-\d{2}-\d{2}$/;
+
   function showError(errId, on) {
     const el = document.getElementById(errId);
     if (on) el.classList.add('visible');
@@ -171,6 +181,7 @@
   // ============ 2. ЭЛЕМЕНТЫ ============
   const titleEl = document.getElementById('title');
   const abbrEl = document.getElementById('abbrlink');
+  const publishedEl = document.getElementById('published');
   const authorsEl = document.getElementById('authors');
   const tagsEl = document.getElementById('tags');
   const pinEl = document.getElementById('pin');
@@ -331,13 +342,17 @@
 
     const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
 
-    // published: YYYY-MM-DD, без T, времени, Z и запятой
+    // published — ручной ввод из карточки метаданных (дата оригинального поста).
+    const published = publishedEl.value.trim();
+    if (!PUBLISHED_RE.test(published)) throw new Error('Укажите дату публикации в формате YYYY-MM-DD');
+
+    // updated: текущая дата генерации, YYYY-MM-DD, без времени и Z
     const now = new Date().toISOString().split('T')[0];
 
     // Имя файла: всегда только slug заголовка. abbrlink в имени файла не участвует.
     const filename = slug;
 
-    return { title, abbrRaw, abbrValid, slug, authors, tags, draft, pin, toc, lang, body, now, converted, filename };
+    return { title, abbrRaw, abbrValid, slug, authors, tags, draft, pin, toc, lang, body, published, now, converted, filename };
   }
 
   // ============ 6. FRONTMATTER ============
@@ -351,8 +366,8 @@
     ];
     if (data.abbrValid) fmLines.push('abbrlink: ' + data.abbrRaw);
     fmLines.push(
-      'published: ' + data.now,
-      "updated: ''",
+      'published: ' + data.published,
+      'updated: ' + data.now,
       'tags:'
     );
     if (data.tags.length) {
@@ -382,8 +397,9 @@
   function checkFormValidity() {
     const titleOk = titleEl.value.trim().length > 0;
     const abbrOk = abbrEl.value.trim().length === 0 || ABBRLINK_RE.test(abbrEl.value.trim());
+    const publishedOk = PUBLISHED_RE.test(publishedEl.value.trim());
     const contentOk = contentEl.value.trim().length > 0;
-    btnGen.disabled = !(titleOk && abbrOk && contentOk);
+    btnGen.disabled = !(titleOk && abbrOk && publishedOk && contentOk);
   }
 
   // Любая правка формы после генерации гасит «Скачать» и «Копировать»
@@ -398,6 +414,7 @@
   function refreshAll() {
     validateField(titleEl, v => v.length > 0, 'errTitle');
     validateField(abbrEl, v => v.length === 0 || ABBRLINK_RE.test(v), 'errAbbrlink');
+    validateField(publishedEl, v => PUBLISHED_RE.test(v), 'errPublished');
     validateField(contentEl, v => v.length > 0, 'errContent');
     updateFilenamePreview();
     checkFormValidity();
@@ -408,6 +425,15 @@
       invalidateResult();
       refreshAll();
     });
+  });
+
+  publishedEl.addEventListener('input', () => {
+    invalidateResult();
+    refreshAll();
+  });
+  publishedEl.addEventListener('change', () => {
+    invalidateResult();
+    refreshAll();
   });
 
   [authorsEl, tagsEl, pinEl, draftEl, tocEl, langEl].forEach(el => {
