@@ -16,10 +16,16 @@ if (!ROOT) {
   process.exit(1);
 }
 
+
 // картинки: после 14 цифр стоит im_ (склейка) или / (обрезана) — вернуть im_/
 const RX_IMG = /(!\[[^\]]*\]\(\s*)(https?:\/\/web\.archive\.org\/web\/\d{14})(im_|\/)(https?:\/\/[^)\s]+)/g;
 // обычные ссылки (без ! перед [): только склейка im_ -> слеш
 const RX_LNK = /(?<!\!)(\[[^\]]*\]\(\s*)(https?:\/\/web\.archive\.org\/web\/\d{14})im_(https?:\/\/[^)\s]+)/g;
+
+// склейка без слэша: .../web/20161026034738http://... -> .../20161026034738im_/http://...
+const RX_GLUE = /(!\[[^\]]*\]\(\s*)(https?:\/\/web\.archive\.org\/web\/\d{14})(https?:\/\/[^)\s]+)/g;
+...
+let after = before.replace(RX_GLUE, (m, a, b, c) => { count++; return a + b + 'im_/' + c; });
 
 let total = 0;
 
